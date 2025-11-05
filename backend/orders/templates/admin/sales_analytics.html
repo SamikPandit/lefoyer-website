@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div class="module">
+    <h2>Sales Analytics</h2>
+    <table>
+        <tr>
+            <th>Total Sales</th>
+            <td>${{ total_sales|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <th>Total Orders</th>
+            <td>{{ total_orders }}</td>
+        </tr>
+    </table>
+</div>
+{% endblock %}
