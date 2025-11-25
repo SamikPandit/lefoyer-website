@@ -1,6 +1,6 @@
-# Le Foyer E-Commerce Website
+# Le foyeR. E-Commerce Website
 
-This is the repository for the Le Foyer e-commerce website, a full-stack application built with React and Django.
+This is the repository for the Le foyeR. e-commerce website, a full-stack application built with React and Django.
 
 ## Project Structure
 

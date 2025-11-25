@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, List, ListItem, ListItemText, Checkbox, Slider, Divider, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
-import { getCategories, getSubCategories } from '../../services/api';
+import { Box, Typography, List, ListItem, Checkbox, Slider, Divider, FormControl, InputLabel, Select, MenuItem, ListItemText } from '@mui/material';
+import { getCategories, getSubCategories } from '../../services/mockApi';
 
-const suitableForOptions = [
-  'All', 'Oily', 'Dry', 'Sensitive', 'Acne-prone', 'Combination'
-];
+const suitableForOptions = ['All', 'Oily', 'Dry', 'Sensitive', 'Acne-prone', 'Combination'];
 
 const ProductFilter = ({ filters, onFilterChange }) => {
   const [categories, setCategories] = useState([]);
@@ -66,58 +64,61 @@ const ProductFilter = ({ filters, onFilterChange }) => {
 
   return (
     <Box>
-      <Typography variant="h6" gutterBottom>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.938rem' }}>
         Category
       </Typography>
-      <List dense>
+      <List dense sx={{ py: 0 }}>
         {categories.map((category) => (
-          <ListItem key={category.id} disablePadding>
+          <ListItem key={category.id} disablePadding sx={{ py: 0.25 }}>
             <Checkbox
               edge="start"
               checked={filters.category?.includes(category.id) || false}
               onChange={() => handleCategoryChange(category.id)}
+              size="small"
             />
-            <ListItemText primary={category.name} />
+            <ListItemText primary={category.name} primaryTypographyProps={{ fontSize: '0.875rem' }} />
           </ListItem>
         ))}
       </List>
       <Divider sx={{ my: 2 }} />
 
-      <Typography variant="h6" gutterBottom>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.938rem' }}>
         Sub-Category
       </Typography>
-      <List dense>
+      <List dense sx={{ py: 0 }}>
         {subCategories.map((subCategory) => (
-          <ListItem key={subCategory.id} disablePadding>
+          <ListItem key={subCategory.id} disablePadding sx={{ py: 0.25 }}>
             <Checkbox
               edge="start"
               checked={filters.sub_category?.includes(subCategory.id) || false}
               onChange={() => handleSubCategoryChange(subCategory.id)}
+              size="small"
             />
-            <ListItemText primary={subCategory.name} />
+            <ListItemText primary={subCategory.name} primaryTypographyProps={{ fontSize: '0.875rem' }} />
           </ListItem>
         ))}
       </List>
       <Divider sx={{ my: 2 }} />
 
-      <Typography variant="h6" gutterBottom>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.938rem' }}>
         Suitable For
       </Typography>
-      <List dense>
+      <List dense sx={{ py: 0 }}>
         {suitableForOptions.map((type) => (
-          <ListItem key={type} disablePadding>
+          <ListItem key={type} disablePadding sx={{ py: 0.25 }}>
             <Checkbox
               edge="start"
               checked={filters.suitable_for?.includes(type) || false}
               onChange={() => handleSuitableForChange(type)}
+              size="small"
             />
-            <ListItemText primary={type} />
+            <ListItemText primary={type} primaryTypographyProps={{ fontSize: '0.875rem' }} />
           </ListItem>
         ))}
       </List>
       <Divider sx={{ my: 2 }} />
 
-      <Typography variant="h6" gutterBottom>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.938rem' }}>
         Price Range
       </Typography>
       <Slider
@@ -127,23 +128,22 @@ const ProductFilter = ({ filters, onFilterChange }) => {
         valueLabelDisplay="auto"
         min={0}
         max={2000}
-        sx={{ ml: 1, width: '95%'}}
+        sx={{ ml: 1, width: '95%' }}
       />
-       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Typography variant="body2">₹{priceRange[0]}</Typography>
-        <Typography variant="body2">₹{priceRange[1]}</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 1 }}>
+        <Typography variant="body2" fontSize="0.813rem">₹{priceRange[0]}</Typography>
+        <Typography variant="body2" fontSize="0.813rem">₹{priceRange[1]}</Typography>
       </Box>
       <Divider sx={{ my: 2 }} />
 
-      <Typography variant="h6" gutterBottom>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.938rem' }}>
         Sort By
       </Typography>
       <FormControl fullWidth size="small">
-        <InputLabel>Sort By</InputLabel>
         <Select
           value={filters.ordering || ''}
-          label="Sort By"
           onChange={handleSortChange}
+          displayEmpty
         >
           <MenuItem value="">None</MenuItem>
           <MenuItem value="price">Price: Low to High</MenuItem>

@@ -3,68 +3,137 @@ import { createTheme } from '@mui/material/styles';
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#D4A5A5', // Dusty Rose
+      main: '#C9A96E', // Refined Gold
+      light: '#E8D4B0',
+      dark: '#9D7E4A',
+      contrastText: '#FFFFFF',
     },
     secondary: {
-      main: '#8B7B8B', // Muted Purple
-    },
-    accent: {
-      main: '#C8A882', // Warm Gold/Beige
-    },
-    success: {
-      main: '#7FB069', // Sage Green
+      main: '#1A1A1A', // Soft Black
+      light: '#333333',
+      dark: '#000000',
+      contrastText: '#FFFFFF',
     },
     background: {
-      default: '#FDFBF7', // Cream White
+      default: '#FDFBF9', // Warm Off-White
+      paper: '#FFFFFF',
     },
     text: {
-      primary: '#4E4E4E', // Dark Warm Gray
-      secondary: '#6B6B6B', // Medium Gray
+      primary: '#1A1A1A',
+      secondary: '#666666',
     },
+    divider: 'rgba(201, 169, 110, 0.15)',
   },
   typography: {
-    fontFamily: [
-      'Lato',
-      'sans-serif',
-    ].join(','),
+    fontFamily: "'Inter', sans-serif",
     h1: {
-      fontFamily: 'Playfair Display, serif',
+      fontFamily: "'Cormorant Garamond', serif",
+      fontWeight: 400,
+      fontSize: '4.5rem',
+      lineHeight: 1.1,
+      letterSpacing: '-0.02em',
     },
     h2: {
-      fontFamily: 'Playfair Display, serif',
+      fontFamily: "'Cormorant Garamond', serif",
+      fontWeight: 400,
+      fontSize: '3.5rem',
+      lineHeight: 1.2,
+      letterSpacing: '-0.01em',
     },
     h3: {
-      fontFamily: 'Playfair Display, serif',
+      fontFamily: "'Cormorant Garamond', serif",
+      fontWeight: 500,
+      fontSize: '2.5rem',
+      lineHeight: 1.3,
     },
     h4: {
-      fontFamily: 'Playfair Display, serif',
+      fontFamily: "'Cormorant Garamond', serif",
+      fontWeight: 500,
+      fontSize: '2rem',
+      lineHeight: 1.4,
     },
     h5: {
-      fontFamily: 'Playfair Display, serif',
+      fontFamily: "'Inter', sans-serif",
+      fontWeight: 500,
+      fontSize: '1.25rem',
+      letterSpacing: '0.02em',
     },
     h6: {
-      fontFamily: 'Playfair Display, serif',
+      fontFamily: "'Inter', sans-serif",
+      fontWeight: 600,
+      fontSize: '1rem',
+      letterSpacing: '0.05em',
+      textTransform: 'uppercase',
     },
+    subtitle1: {
+      fontFamily: "'Inter', sans-serif",
+      fontSize: '1.125rem',
+      lineHeight: 1.6,
+      color: '#666666',
+    },
+    button: {
+      fontFamily: "'Inter', sans-serif",
+      fontWeight: 500,
+      letterSpacing: '0.1em',
+      textTransform: 'uppercase',
+    },
+  },
+  shape: {
+    borderRadius: 0, // Sharp corners for luxury feel
   },
   components: {
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: '25px',
-          textTransform: 'none',
-          padding: '10px 20px',
+          borderRadius: 0,
+          padding: '12px 32px',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: '0 4px 12px rgba(201, 169, 110, 0.2)',
+          },
+        },
+        contained: {
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: '0 4px 12px rgba(201, 169, 110, 0.2)',
+          },
+        },
+        outlined: {
+          borderWidth: '1px',
+          '&:hover': {
+            borderWidth: '1px',
+            backgroundColor: 'rgba(201, 169, 110, 0.05)',
+          },
         },
       },
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: '16px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-          transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
-          '&:hover': {
-            transform: 'translateY(-5px)',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.1)',
+          backgroundImage: 'none',
+          boxShadow: 'none',
+          border: '1px solid transparent',
+          transition: 'all 0.3s ease',
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          boxShadow: 'none',
+          backgroundColor: 'transparent',
+        },
+      },
+    },
+    MuiContainer: {
+      styleOverrides: {
+        root: {
+          paddingLeft: '24px',
+          paddingRight: '24px',
+          '@media (min-width: 600px)': {
+            paddingLeft: '32px',
+            paddingRight: '32px',
           },
         },
       },

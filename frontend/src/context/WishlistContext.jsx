@@ -1,30 +1,26 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import api from '../services/api';
-import { useAuth } from './AuthContext';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+  getWishlist,
+  addToWishlist as mockAddToWishlist,
+  removeFromWishlist as mockRemoveFromWishlist
+} from '../services/mockApi';
 
-const WishlistContext = createContext(null);
+const WishlistContext = createContext();
 
 export const WishlistProvider = ({ children }) => {
-  const { user, token } = useAuth();
   const [wishlist, setWishlist] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchWishlist = async () => {
-    if (!token) {
-      setWishlist(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
     try {
-      const response = await api.get('wishlist/');
+      setLoading(true);
+      const response = await getWishlist();
       setWishlist(response.data);
       setError(null);
     } catch (err) {
       console.error('Failed to fetch wishlist:', err);
-      setError('Failed to load wishlist.');
-      setWishlist(null);
+      setError('Failed to load wishlist');
     } finally {
       setLoading(false);
     }
@@ -32,55 +28,46 @@ export const WishlistProvider = ({ children }) => {
 
   useEffect(() => {
     fetchWishlist();
-  }, [token]); // Refetch wishlist when token changes (login/logout)
+  }, []);
 
   const addToWishlist = async (productId) => {
-    if (!token) {
-      setError('Please log in to add items to your wishlist.');
-      return;
-    }
     try {
-      const response = await api.post('wishlist/add/', { product_id: productId });
+      const response = await mockAddToWishlist(productId);
       setWishlist(response.data);
-      setError(null);
       return true;
     } catch (err) {
       console.error('Failed to add to wishlist:', err);
-      setError('Failed to add item to wishlist.');
       return false;
     }
   };
 
   const removeFromWishlist = async (productId) => {
-    if (!token) return;
     try {
-      const response = await api.delete(`wishlist/remove/${productId}/`);
+      const response = await mockRemoveFromWishlist(productId);
       setWishlist(response.data);
-      setError(null);
       return true;
     } catch (err) {
       console.error('Failed to remove from wishlist:', err);
-      setError('Failed to remove item from wishlist.');
       return false;
     }
   };
 
-  const wishlistContextValue = {
+  const value = {
     wishlist,
     loading,
     error,
-    fetchWishlist,
     addToWishlist,
     removeFromWishlist,
+    fetchWishlist
   };
 
-  return (
-    <WishlistContext.Provider value={wishlistContextValue}>
-      {children}
-    </WishlistContext.Provider>
-  );
+  return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>;
 };
 
 export const useWishlist = () => {
-  return useContext(WishlistContext);
+  const context = useContext(WishlistContext);
+  if (!context) {
+    throw new Error('useWishlist must be used within WishlistProvider');
+  }
+  return context;
 };

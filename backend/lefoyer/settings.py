@@ -51,11 +51,11 @@ INSTALLED_APPS = [
 ]
 
 JAZZMIN_SETTINGS = {
-    "site_title": "Le Foyer Admin",
-    "site_header": "Le Foyer",
-    "site_brand": "Le Foyer",
-    "welcome_sign": "Welcome to Le Foyer Admin",
-    "copyright": "Le Foyer Global",
+    "site_title": "Le foyeR. Admin",
+    "site_header": "Le foyeR.",
+    "site_brand": "Le foyeR.",
+    "welcome_sign": "Welcome to Le foyeR. Admin",
+    "copyright": "Le foyeR. Global",
     "site_logo": None,
     "custom_css": "/home/samikpandit/scpl/lefoyer-ecommerce/backend/static/admin/css/custom.css",
     "custom_links": {

@@ -1,36 +1,38 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, IconButton, Box } from '@mui/material';
-import { Search, PersonOutline, ShoppingCartOutlined } from '@mui/icons-material';
+import { AppBar, Toolbar, Typography, Box, Button, Link as MuiLink } from '@mui/material';
 import { Link } from 'react-router-dom';
 
 const Header = () => {
   return (
-    <AppBar position="sticky" color="background" elevation={1}>
-      <Toolbar>
+    <AppBar position="sticky" sx={{ backgroundColor: 'background.default', color: 'text.primary' }} elevation={0}>
+      <Toolbar sx={{ justifyContent: 'space-between', py: 1 }}>
         <Typography 
-          variant="h4" 
+          variant="h5" 
           component={Link}
           to="/"
           sx={{ 
-            flexGrow: 1, 
-            fontFamily: 'Playfair Display, serif', 
             fontWeight: 700,
             textDecoration: 'none',
-            color: 'text.primary'
+            color: 'inherit'
           }}
         >
-          Le Foyer
+          Le foyeR.
         </Typography>
-        <Box>
-          <IconButton color="inherit">
-            <Search />
-          </IconButton>
-          <IconButton color="inherit" component={Link} to="/login">
-            <PersonOutline />
-          </IconButton>
-          <IconButton color="inherit" component={Link} to="/cart">
-            <ShoppingCartOutlined />
-          </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <MuiLink component={Link} to="/products" color="inherit" underline="hover" sx={{ fontWeight: 500 }}>
+            Products
+          </MuiLink>
+          <MuiLink component={Link} to="/about" color="inherit" underline="hover" sx={{ fontWeight: 500 }}>
+            About
+          </MuiLink>
+          <MuiLink component={Link} to="/contact" color="inherit" underline="hover" sx={{ fontWeight: 500 }}>
+            Contact
+          </MuiLink>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <MuiLink component={Link} to="/login" color="inherit" underline="hover" sx={{ fontWeight: 500 }}>
+            Sign In
+          </MuiLink>
         </Box>
       </Toolbar>
     </AppBar>

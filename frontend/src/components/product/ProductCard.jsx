@@ -1,131 +1,234 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardActionArea, CardMedia, CardContent, CardActions, Typography, IconButton, Box, Snackbar, Alert } from '@mui/material';
-import { ShoppingCartOutlined, FavoriteBorder, Favorite } from '@mui/icons-material';
+import React, { useState } from 'react';
+import { Card, CardMedia, CardContent, Typography, Box, IconButton, Button, Rating, Chip } from '@mui/material';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import { Link } from 'react-router-dom';
-import { useCart } from '../../context/CartContext';
-import { useWishlist } from '../../context/WishlistContext';
 
-const ProductCard = ({ product, view = 'grid' }) => {
-  const { addToCart } = useCart();
-  const { wishlist, addToWishlist, removeFromWishlist } = useWishlist();
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
-  const [isWishlisted, setIsWishlisted] = useState(false);
+const ProductCard = ({ product }) => {
+  const [isHovered, setIsHovered] = useState(false);
 
-  useEffect(() => {
-    if (wishlist && product) {
-      setIsWishlisted(wishlist.products.some(item => item.id === product.id));
-    }
-  }, [wishlist, product]);
+  // Fallback if product is undefined or missing properties
+  if (!product) return null;
 
-  // Fallback for missing product data
-  if (!product) {
-    return null;
-  }
-
-  const handleAddToCart = async () => {
-    const success = await addToCart(product.id);
-    if (success) {
-      setSnackbarMessage(`${product.name} added to cart!`);
-      setSnackbarSeverity('success');
-    } else {
-      setSnackbarMessage('Failed to add to cart. Please try again.');
-      setSnackbarSeverity('error');
-    }
-    setOpenSnackbar(true);
-  };
-
-  const handleToggleWishlist = async () => {
-    let success;
-    if (isWishlisted) {
-      success = await removeFromWishlist(product.id);
-      if (success) {
-        setSnackbarMessage(`${product.name} removed from wishlist!`);
-        setSnackbarSeverity('info');
-      } else {
-        setSnackbarMessage('Failed to remove from wishlist.');
-        setSnackbarSeverity('error');
-      }
-    } else {
-      success = await addToWishlist(product.id);
-      if (success) {
-        setSnackbarMessage(`${product.name} added to wishlist!`);
-        setSnackbarSeverity('success');
-      } else {
-        setSnackbarMessage('Failed to add to wishlist. Please try again.');
-        setSnackbarSeverity('error');
-      }
-    }
-    setOpenSnackbar(true);
-  };
-
-  const handleCloseSnackbar = () => {
-    setOpenSnackbar(false);
-  };
+  const {
+    id,
+    name,
+    price,
+    image_main,
+    image_2,
+    category,
+    rating = 0,
+    reviews_count = 0,
+    is_new,
+    coming_soon
+  } = product;
 
   return (
-    <Card 
+    <Card
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       sx={{
-        display: view === 'list' ? 'flex' : 'block',
-        flexDirection: view === 'list' ? 'row' : 'column',
-        maxWidth: view === 'list' ? '100%' : 345,
+        position: 'relative',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: 'transparent',
+        opacity: coming_soon ? 0.8 : 1,
+        pointerEvents: coming_soon ? 'none' : 'auto',
       }}
     >
-      <CardActionArea 
-        component={Link} 
-        to={`/product/${product.slug}`}
-        sx={{ display: view === 'list' ? 'flex' : 'block', flexShrink: 0, width: view === 'list' ? 150 : 'auto' }}
-      >
+      {/* Image Container */}
+      <Box sx={{ position: 'relative', paddingTop: '125%', overflow: 'hidden', bgcolor: '#F9F9F9' }}>
+
+        {/* Coming Soon Overlay */}
+        {coming_soon && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 3,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(255, 255, 255, 0.4)',
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            <Chip
+              label="COMING SOON"
+              sx={{
+                bgcolor: 'primary.main',
+                color: 'white',
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                borderRadius: 0,
+              }}
+            />
+          </Box>
+        )}
+
+        {/* Badges */}
+        {is_new && !coming_soon && (
+          <Chip
+            label="NEW"
+            size="small"
+            sx={{
+              position: 'absolute',
+              top: 12,
+              left: 12,
+              zIndex: 2,
+              bgcolor: 'white',
+              borderRadius: 0,
+              fontSize: '0.7rem',
+              height: 24
+            }}
+          />
+        )}
+
+        {/* Wishlist Button */}
+        {!coming_soon && (
+          <IconButton
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 2,
+              bgcolor: 'rgba(255,255,255,0.8)',
+              opacity: isHovered ? 1 : 0,
+              transform: isHovered ? 'translateY(0)' : 'translateY(-10px)',
+              transition: 'all 0.3s ease',
+              '&:hover': { bgcolor: 'white' }
+            }}
+          >
+            <FavoriteBorderIcon fontSize="small" />
+          </IconButton>
+        )}
+
+        {/* Main Image */}
         <CardMedia
           component="img"
-          height={view === 'list' ? 150 : 240}
-          image={product.image_main || 'https://source.unsplash.com/random/400x400?beauty-product'}
-          alt={product.name}
-          sx={{ width: view === 'list' ? 150 : '100%', objectFit: 'cover' }}
+          image={image_main}
+          alt={name}
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transition: 'opacity 0.5s ease',
+            opacity: isHovered && image_2 && !coming_soon ? 0 : 1,
+            filter: coming_soon ? 'grayscale(0.5)' : 'none',
+          }}
         />
-      </CardActionArea>
-      <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-        <CardContent sx={{ flexGrow: 1, minHeight: view === 'list' ? 'auto' : 100 }}>
-          <Typography gutterBottom variant="h6" component="div" sx={{ fontFamily: 'Playfair Display, serif', fontWeight: 600 }}>
-            {product.name}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {product.suitable_for}
-          </Typography>
-          {view === 'list' && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {product.description.substring(0, 100)}...
-            </Typography>
-          )}
-        </CardContent>
-        <CardActions disableSpacing sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-          <Typography variant="h6" color="text.primary" sx={{ fontWeight: 'bold' }}>
-            ₹{product.price}
-          </Typography>
-          <Box>
-            <IconButton aria-label="add to wishlist" onClick={handleToggleWishlist}>
-              {isWishlisted ? <Favorite color="error" /> : <FavoriteBorder />}
-            </IconButton>
-            <IconButton 
-              aria-label="add to cart" 
+
+        {/* Secondary Image (on hover) */}
+        {image_2 && !coming_soon && (
+          <CardMedia
+            component="img"
+            image={image_2}
+            alt={name}
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transition: 'opacity 0.5s ease',
+              opacity: isHovered ? 1 : 0,
+            }}
+          />
+        )}
+
+        {/* Quick Add Button */}
+        {!coming_soon && (
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              p: 2,
+              transform: isHovered ? 'translateY(0)' : 'translateY(100%)',
+              transition: 'transform 0.3s ease',
+              zIndex: 2,
+            }}
+          >
+            <Button
+              variant="contained"
+              fullWidth
+              startIcon={<ShoppingBagOutlinedIcon />}
               sx={{
-                backgroundColor: 'primary.main',
-                color: 'white',
-                '&:hover': { backgroundColor: 'primary.dark' }
+                bgcolor: 'rgba(255, 255, 255, 0.95)',
+                color: 'text.primary',
+                backdropFilter: 'blur(4px)',
+                '&:hover': {
+                  bgcolor: 'primary.main',
+                  color: 'white',
+                }
               }}
-              onClick={handleAddToCart}
             >
-              <ShoppingCartOutlined />
-            </IconButton>
+              Quick Add
+            </Button>
           </Box>
-        </CardActions>
+        )}
       </Box>
-      <Snackbar open={openSnackbar} autoHideDuration={3000} onClose={handleCloseSnackbar}>
-        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
+
+      {/* Content */}
+      <CardContent sx={{ px: 1, py: 2, flexGrow: 1 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: 'block', mb: 0.5, letterSpacing: '0.05em' }}
+        >
+          {category?.name || 'Skincare'}
+        </Typography>
+
+        {coming_soon ? (
+          <Typography
+            variant="h6"
+            sx={{
+              fontFamily: "'Cormorant Garamond', serif",
+              fontSize: '1.25rem',
+              mb: 1,
+              lineHeight: 1.2,
+              color: 'text.secondary',
+            }}
+          >
+            {name}
+          </Typography>
+        ) : (
+          <Link to={`/product/${product.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontFamily: "'Cormorant Garamond', serif",
+                fontSize: '1.25rem',
+                mb: 1,
+                lineHeight: 1.2,
+                '&:hover': { color: 'primary.main' }
+              }}
+            >
+              {name}
+            </Typography>
+          </Link>
+        )}
+
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <Rating value={Number(rating)} readOnly size="small" sx={{ fontSize: '0.9rem', color: '#C9A96E', opacity: coming_soon ? 0.5 : 1 }} />
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+            ({reviews_count})
+          </Typography>
+        </Box>
+
+        <Typography variant="body1" fontWeight={500} color={coming_soon ? 'text.secondary' : 'text.primary'}>
+          ₹{price}
+        </Typography>
+      </CardContent>
     </Card>
   );
 };

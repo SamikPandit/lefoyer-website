@@ -1,6 +1,6 @@
 import React from 'react';
 import Slider from 'react-slick';
-import { Box, Typography, Paper, Avatar } from '@mui/material';
+import { Box, Typography, Container, Avatar, Rating } from '@mui/material';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import "slick-carousel/slick/slick.css"; 
 import "slick-carousel/slick/slick-theme.css";
@@ -8,24 +8,27 @@ import "slick-carousel/slick/slick-theme.css";
 const testimonials = [
   {
     id: 1,
-    name: 'Jane Doe',
-    title: 'Skincare Enthusiast',
-    quote: 'Le Foyer products have transformed my skin! I love the natural ingredients and how gentle they are. Highly recommend!',
-    avatar: 'https://source.unsplash.com/random/100x100?person1',
+    name: 'Sarah P.',
+    title: 'Beauty Enthusiast',
+    rating: 5,
+    quote: 'The body care products are luxurious and leave my skin feeling incredibly soft and hydrated. The scents are subtle and beautiful. My skin has never felt so pampered!',
+    avatar: 'https://randomuser.me/api/portraits/women/65.jpg',
   },
   {
     id: 2,
-    name: 'John Smith',
-    title: 'Happy Customer',
-    quote: 'Finally, a brand that delivers on its promises. My hair feels amazing after using their haircare range.',
-    avatar: 'https://source.unsplash.com/random/100x100?person2',
+    name: 'Jessica L.',
+    title: 'Verified Buyer',
+    rating: 5,
+    quote: 'Le foyeR. products have transformed my skin! I love the natural ingredients and how gentle they are. My skin has never felt so soft and looked so radiant.',
+    avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
   },
   {
     id: 3,
-    name: 'Emily White',
-    title: 'Beauty Blogger',
-    quote: 'The body care products are luxurious and leave my skin feeling incredibly soft and hydrated. A must-try!',
-    avatar: 'https://source.unsplash.com/random/100x100?person3',
+    name: 'David C.',
+    title: 'Happy Customer',
+    rating: 5,
+    quote: 'Finally, a brand that delivers on its promises. My hair feels amazing after using their haircare range. It\'s stronger, shinier, and much more manageable.',
+    avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
   },
 ];
 
@@ -33,52 +36,174 @@ const CustomerTestimonials = () => {
   const settings = {
     dots: true,
     infinite: true,
-    speed: 500,
+    speed: 800,
     slidesToShow: 1,
     slidesToScroll: 1,
     autoplay: true,
-    autoplaySpeed: 5000,
+    autoplaySpeed: 6000,
     arrows: false,
+    fade: true,
+    dotsClass: 'slick-dots custom-dots',
   };
 
   return (
-    <Box sx={{ my: 8, py: 4, backgroundColor: 'background.default' }}>
-      <Typography variant="h4" component="h2" align="center" gutterBottom sx={{ fontFamily: 'Playfair Display, serif', fontWeight: 700, mb: 6 }}>
-        What Our Customers Say
-      </Typography>
-      <Slider {...settings}>
-        {testimonials.map((testimonial) => (
-          <Box key={testimonial.id} sx={{ px: { xs: 2, md: 8 } }}>
-            <Paper 
-              elevation={3} 
-              sx={{
-                p: 4, 
-                borderRadius: 4, 
-                textAlign: 'center',
-                maxWidth: 700,
-                mx: 'auto',
-                position: 'relative',
-              }}
-            >
-              <FormatQuoteIcon sx={{ fontSize: 60, color: 'primary.main', position: 'absolute', top: 10, left: 10, opacity: 0.2 }} />
-              <Avatar 
-                src={testimonial.avatar} 
-                alt={testimonial.name} 
-                sx={{ width: 80, height: 80, mx: 'auto', mb: 2, border: '3px solid', borderColor: 'primary.main' }}
-              />
-              <Typography variant="body1" sx={{ fontStyle: 'italic', mb: 2, color: 'text.secondary' }}>
-                "{testimonial.quote}"
-              </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                {testimonial.name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {testimonial.title}
-              </Typography>
-            </Paper>
-          </Box>
-        ))}
-      </Slider>
+    <Box sx={{ py: { xs: 10, md: 14 }, backgroundColor: 'background.default' }}>
+      <Container maxWidth="md">
+        {/* Section Header */}
+        <Box sx={{ textAlign: 'center', mb: 8 }}>
+          <Typography
+            variant="caption"
+            component="p"
+            sx={{
+              color: 'primary.main',
+              mb: 2,
+              fontWeight: 600,
+            }}
+          >
+            Testimonials
+          </Typography>
+          
+          <Typography 
+            variant="h2" 
+            component="h2" 
+            gutterBottom
+            sx={{ 
+              color: 'text.primary',
+              mb: 2,
+              position: 'relative',
+              display: 'inline-block',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                bottom: '-8px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '60px',
+                height: '2px',
+                background: 'linear-gradient(90deg, transparent, #C9A96E, transparent)',
+              },
+            }}
+          >
+            What Our Customers Say
+          </Typography>
+          
+          <Typography 
+            variant="body1" 
+            color="text.secondary" 
+            sx={{ maxWidth: 500, mx: 'auto', mt: 3 }}
+          >
+            Real experiences from our beloved community
+          </Typography>
+        </Box>
+
+        {/* Testimonials Carousel */}
+        <Box 
+          sx={{ 
+            '& .custom-dots': {
+              bottom: '-40px',
+              '& li': {
+                '& button:before': {
+                  fontSize: '10px',
+                  color: '#C9A96E',
+                  opacity: 0.3,
+                },
+                '&.slick-active button:before': {
+                  color: '#C9A96E',
+                  opacity: 1,
+                },
+              },
+            },
+          }}
+        >
+          <Slider {...settings}>
+            {testimonials.map((testimonial) => (
+              <Box key={testimonial.id}>
+                <Box
+                  sx={{
+                    p: { xs: 4, md: 6 },
+                    textAlign: 'center',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Quote Icon */}
+                  <FormatQuoteIcon 
+                    sx={{ 
+                      fontSize: 72, 
+                      color: 'secondary.main',
+                      opacity: 0.3,
+                      mb: 3,
+                    }} 
+                  />
+
+                  {/* Rating */}
+                  <Rating 
+                    value={testimonial.rating} 
+                    readOnly 
+                    sx={{ 
+                      mb: 3,
+                      '& .MuiRating-iconFilled': {
+                        color: '#C9A96E',
+                      },
+                    }}
+                    size="large"
+                  />
+
+                  {/* Quote Text */}
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      fontFamily: 'Cormorant Garamond, serif',
+                      fontStyle: 'italic',
+                      mb: 4,
+                      color: 'text.primary',
+                      lineHeight: 1.8,
+                      fontWeight: 400,
+                      fontSize: { xs: '1.25rem', md: '1.5rem' },
+                    }}
+                  >
+                    "{testimonial.quote}"
+                  </Typography>
+
+                  {/* Avatar & Name */}
+                  <Avatar 
+                    src={testimonial.avatar} 
+                    alt={testimonial.name} 
+                    sx={{ 
+                      width: 72, 
+                      height: 72, 
+                      mx: 'auto',
+                      mb: 2,
+                      border: '3px solid',
+                      borderColor: 'secondary.light',
+                    }}
+                  />
+
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      fontWeight: 500,
+                      color: 'text.primary',
+                      mb: 0.5,
+                    }}
+                  >
+                    {testimonial.name}
+                  </Typography>
+                  
+                  <Typography 
+                    variant="caption" 
+                    sx={{
+                      color: 'text.secondary',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    {testimonial.title}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Slider>
+        </Box>
+      </Container>
     </Box>
   );
 };

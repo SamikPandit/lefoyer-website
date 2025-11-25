@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import Slider from 'react-slick';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Grid } from '@mui/material';
 import ProductCard from '../product/ProductCard';
-import { getRelatedProducts } from '../../services/api';
-import "slick-carousel/slick/slick.css"; 
-import "slick-carousel/slick/slick-theme.css";
+import { getRelatedProducts } from '../../services/mockApi';
 
 const RelatedProducts = ({ productId }) => {
   const [products, setProducts] = useState([]);
@@ -23,49 +20,20 @@ const RelatedProducts = ({ productId }) => {
     fetchRelatedProducts();
   }, [productId]);
 
-  const settings = {
-    dots: true,
-    infinite: true,
-    speed: 500,
-    slidesToShow: 4,
-    slidesToScroll: 1,
-    autoplay: true,
-    responsive: [
-      {
-        breakpoint: 1280,
-        settings: {
-          slidesToShow: 3,
-        }
-      },
-      {
-        breakpoint: 960,
-        settings: {
-          slidesToShow: 2,
-        }
-      },
-      {
-        breakpoint: 600,
-        settings: {
-          slidesToShow: 1,
-        }
-      }
-    ]
-  };
-
   if (products.length === 0) return null;
 
   return (
-    <Box sx={{ my: 6 }}>
-      <Typography variant="h5" component="h2" gutterBottom sx={{ fontFamily: 'Playfair Display, serif', fontWeight: 700, mb: 4 }}>
+    <Box>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
         Related Products
       </Typography>
-      <Slider {...settings}>
-        {products.map((product) => (
-          <Box key={product.id} sx={{ p: 2 }}>
+      <Grid container spacing={2}>
+        {products.slice(0, 4).map((product) => (
+          <Grid item xs={6} sm={4} md={3} key={product.id}>
             <ProductCard product={product} />
-          </Box>
+          </Grid>
         ))}
-      </Slider>
+      </Grid>
     </Box>
   );
 };

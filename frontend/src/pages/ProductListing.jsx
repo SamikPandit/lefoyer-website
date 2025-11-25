@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Container, Grid, Box, Typography, Paper, Chip, Stack, Button } from '@mui/material';
+import { Container, Grid, Box, Typography, Paper, Chip, Stack, Button, Drawer, IconButton, useMediaQuery, useTheme } from '@mui/material';
+import { Close as CloseIcon, FilterList } from '@mui/icons-material';
 import ProductCard from '../components/product/ProductCard';
 import ProductFilter from '../components/product/ProductFilter';
 import ProductViewToggle from '../components/product/ProductViewToggle';
 import ProductPagination from '../components/product/ProductPagination';
-import { getProducts, getCategories, getSubCategories } from '../services/api';
+import { getProducts, getCategories, getSubCategories } from '../services/mockApi';
 import { useLocation } from 'react-router-dom';
 
 const ProductListing = () => {
@@ -12,10 +13,13 @@ const ProductListing = () => {
   const [filters, setFilters] = useState({});
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
-  const [view, setView] = useState('grid'); // 'grid' or 'list'
+  const [view, setView] = useState('grid');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -46,7 +50,7 @@ const ProductListing = () => {
     try {
       const response = await getProducts({ ...filters, page });
       setProducts(response.data.results);
-      setTotalPages(Math.ceil(response.data.count / 10)); // Assuming 10 items per page
+      setTotalPages(Math.ceil(response.data.count / 10));
     } catch (error) {
       console.error('Failed to fetch products:', error);
     }
@@ -58,7 +62,7 @@ const ProductListing = () => {
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
-    setPage(1); // Reset to first page on filter change
+    setPage(1);
   };
 
   const handleRemoveFilter = (filterType, valueToRemove) => {
@@ -75,12 +79,12 @@ const ProductListing = () => {
       delete newFilters[filterType];
       setFilters(newFilters);
     }
-    setPage(1); // Reset to first page on filter change
+    setPage(1);
   };
 
   const handleClearAllFilters = () => {
     setFilters({});
-    setPage(1); // Reset to first page on clear all
+    setPage(1);
   };
 
   const handleViewChange = (event, nextView) => {
@@ -91,21 +95,22 @@ const ProductListing = () => {
 
   const handlePageChange = (event, value) => {
     setPage(value);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getFilterLabel = (filterType, value) => {
     if (filterType === 'category') {
       const cat = categories.find(c => c.id === value);
-      return cat ? `Category: ${cat.name}` : `Category ID: ${value}`;
+      return cat ? cat.name : `Category ${value}`;
     } else if (filterType === 'sub_category') {
       const subCat = subCategories.find(sc => sc.id === value);
-      return subCat ? `Sub-Category: ${subCat.name}` : `Sub-Category ID: ${value}`;
+      return subCat ? subCat.name : `Sub-Category ${value}`;
     } else if (filterType === 'suitable_for') {
-      return `Suitable For: ${value}`;
+      return value;
     } else if (filterType === 'min_price') {
-      return `Min Price: ₹${value}`;
+      return `Min: ₹${value}`;
     } else if (filterType === 'max_price') {
-      return `Max Price: ₹${value}`;
+      return `Max: ₹${value}`;
     } else if (filterType === 'ordering') {
       const sortOptions = {
         'price': 'Price: Low to High',
@@ -113,7 +118,7 @@ const ProductListing = () => {
         '-created_at': 'Newest',
         '-rating': 'Top Rated',
       };
-      return `Sort: ${sortOptions[value] || value}`;
+      return sortOptions[value] || value;
     }
     return `${filterType}: ${value}`;
   };
@@ -129,77 +134,171 @@ const ProductListing = () => {
     return [];
   });
 
+  const FilterContent = () => (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 600 }}>
+          Filters
+        </Typography>
+        {isMobile && (
+          <IconButton onClick={() => setMobileFiltersOpen(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        )}
+      </Box>
+      <ProductFilter filters={filters} onFilterChange={handleFilterChange} />
+    </Box>
+  );
+
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Grid container spacing={4}>
-        {/* Filter Sidebar */}
-        <Grid xs={12} md={3}>
-          <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #eee', position: 'sticky', top: 80 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontFamily: 'Playfair Display, serif', fontWeight: 700 }}>
-              Filters
-            </Typography>
-            <ProductFilter filters={filters} onFilterChange={handleFilterChange} />
-          </Paper>
-        </Grid>
+    <Box sx={{ backgroundColor: '#FAFAFA', minHeight: '100vh', py: 3 }}>
+      <Container maxWidth="lg">
+        <Box sx={{ display: 'flex', gap: 2.5 }}>
+          {/* Desktop Filter Sidebar - Fixed Width */}
+          {!isMobile && (
+            <Box sx={{ width: '260px', flexShrink: 0 }}>
+              <Paper 
+                elevation={0} 
+                sx={{ 
+                  p: 2,
+                  position: 'sticky',
+                  top: 80,
+                  border: '1px solid',
+                  borderColor: 'grey.200',
+                  backgroundColor: 'white',
+                }}
+              >
+                <FilterContent />
+              </Paper>
+            </Box>
+          )}
 
-        {/* Product Grid */}
-        <Grid xs={12} md={9}>
-          {/* Active Filters Display */}
-          {activeFilters.length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ mr: 1 }}>Active Filters:</Typography>
-                {activeFilters.map((filter, index) => (
-                  <Chip
-                    key={index}
-                    label={getFilterLabel(filter.type, filter.value)}
-                    onDelete={() => handleRemoveFilter(filter.type, filter.value)}
-                    sx={{ mb: 1 }}
-                  />
-                ))}
-                <Button 
-                  onClick={handleClearAllFilters} 
-                  size="small" 
-                  sx={{ textTransform: 'none', mb: 1 }}
+          {/* Mobile Filter Drawer */}
+          <Drawer
+            anchor="left"
+            open={mobileFiltersOpen}
+            onClose={() => setMobileFiltersOpen(false)}
+            sx={{
+              display: { xs: 'block', md: 'none' },
+              '& .MuiDrawer-paper': {
+                width: '80%',
+                maxWidth: 320,
+                p: 2,
+              },
+            }}
+          >
+            <FilterContent />
+          </Drawer>
+
+          {/* Product Grid - Flexible Width */}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {/* Mobile Filter Button */}
+            {isMobile && (
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<FilterList />}
+                onClick={() => setMobileFiltersOpen(true)}
+                sx={{ mb: 2 }}
+              >
+                Filters {activeFilters.length > 0 && `(${activeFilters.length})`}
+              </Button>
+            )}
+
+            {/* Active Filters */}
+            {activeFilters.length > 0 && (
+              <Paper elevation={0} sx={{ p: 1.5, mb: 2, border: '1px solid', borderColor: 'grey.200' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.813rem' }}>
+                    Active Filters
+                  </Typography>
+                  <Button 
+                    onClick={handleClearAllFilters} 
+                    size="small" 
+                    sx={{ textTransform: 'none', fontSize: '0.75rem', minWidth: 'auto', p: 0.5 }}
+                  >
+                    Clear All
+                  </Button>
+                </Box>
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                  {activeFilters.map((filter, index) => (
+                    <Chip
+                      key={index}
+                      label={getFilterLabel(filter.type, filter.value)}
+                      onDelete={() => handleRemoveFilter(filter.type, filter.value)}
+                      size="small"
+                      sx={{ fontSize: '0.75rem', height: '26px' }}
+                    />
+                  ))}
+                </Stack>
+              </Paper>
+            )}
+
+            {/* Toolbar */}
+            <Paper 
+              elevation={0}
+              sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                p: 1.5,
+                mb: 2,
+                border: '1px solid',
+                borderColor: 'grey.200',
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.875rem' }}>
+                {products.length} Products
+              </Typography>
+              {!isMobile && <ProductViewToggle view={view} onChange={handleViewChange} />}
+            </Paper>
+
+            {/* Products */}
+            {products.length > 0 ? (
+              <>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: view === 'grid' 
+                      ? { xs: 'repeat(2, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }
+                      : 'repeat(1, 1fr)',
+                    gap: 2,
+                  }}
                 >
-                  Clear All
-                </Button>
-              </Stack>
-            </Box>
-          )}
+                  {products.map((product) => (
+                    <Box key={product.id}>
+                      <ProductCard product={product} view={view} />
+                    </Box>
+                  ))}
+                </Box>
 
-          {/* View Toggle & Sort */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="body2" color="text.secondary">
-              {products.length} Products Found
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <ProductViewToggle view={view} onChange={handleViewChange} />
-            </Box>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <Box sx={{ mt: 3 }}>
+                    <ProductPagination count={totalPages} page={page} onChange={handlePageChange} />
+                  </Box>
+                )}
+              </>
+            ) : (
+              <Paper 
+                elevation={0}
+                sx={{ 
+                  textAlign: 'center', 
+                  py: 8,
+                  border: '1px solid',
+                  borderColor: 'grey.200',
+                }}
+              >
+                <Typography variant="h6" sx={{ mb: 1, fontSize: '1.125rem' }}>No products found</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Try adjusting your filters
+                </Typography>
+              </Paper>
+            )}
           </Box>
-
-          {products.length > 0 ? (
-            <Grid container spacing={4}>
-              {products.map((product) => (
-                <Grid key={product.id} xs={12} sm={view === 'grid' ? 6 : 12} md={view === 'grid' ? 4 : 12}>
-                  <ProductCard product={product} view={view} />
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Box sx={{ textAlign: 'center', width: '100%', py: 10 }}>
-              <Typography variant="h6">No products found</Typography>
-              <Typography color="text.secondary">Try adjusting your filters.</Typography>
-            </Box>
-          )}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <ProductPagination count={totalPages} page={page} onChange={handlePageChange} />
-          )}
-        </Grid>
-      </Grid>
-    </Container>
+        </Box>
+      </Container>
+    </Box>
   );
 };
 

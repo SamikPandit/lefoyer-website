@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Container, Box, Typography, TextField, Button, Grid, Link as MuiLink, CircularProgress, Alert, FormControlLabel, Checkbox, Divider } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { loginUser } from '../services/api';
 import GoogleIcon from '@mui/icons-material/Google';
 import FacebookIcon from '@mui/icons-material/Facebook';
 
@@ -19,10 +18,14 @@ const Login = () => {
     event.preventDefault();
     setLoading(true);
     setError('');
+
     try {
-      const response = await loginUser({ username, password });
-      login(response.data.access);
-      navigate('/');
+      const success = await login({ username, password });
+      if (success) {
+        navigate('/');
+      } else {
+        setError('Failed to login. Please check your credentials.');
+      }
     } catch (err) {
       setError('Failed to login. Please check your credentials.');
       console.error(err);
@@ -30,6 +33,9 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // Demo credentials helper
+
 
   return (
     <Container component="main" maxWidth="xs">
@@ -44,6 +50,9 @@ const Login = () => {
         <Typography component="h1" variant="h4" sx={{ fontFamily: 'Playfair Display, serif', fontWeight: 700 }}>
           Sign in
         </Typography>
+
+
+
         <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
           {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
           <TextField
@@ -97,10 +106,10 @@ const Login = () => {
           </Grid>
           <Divider sx={{ my: 3 }}>Or login with</Divider>
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-            <Button variant="outlined" startIcon={<GoogleIcon />} sx={{ borderRadius: '25px' }}>
+            <Button variant="outlined" startIcon={<GoogleIcon />} sx={{ borderRadius: '25px' }} disabled>
               Google
             </Button>
-            <Button variant="outlined" startIcon={<FacebookIcon />} sx={{ borderRadius: '25px' }}>
+            <Button variant="outlined" startIcon={<FacebookIcon />} sx={{ borderRadius: '25px' }} disabled>
               Facebook
             </Button>
           </Box>

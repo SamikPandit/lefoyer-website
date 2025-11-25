@@ -1,144 +1,145 @@
-import React, { useState } from 'react';
-import { Box, Container, Grid, Typography, Link, IconButton, TextField, Button, CircularProgress, Alert, Divider } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, YouTube, CreditCard, Payment } from '@mui/icons-material';
+import React from 'react';
+import { Box, Container, Grid, Typography, Link, TextField, Button, Stack, IconButton } from '@mui/material';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import PinterestIcon from '@mui/icons-material/Pinterest';
 
 const Footer = () => {
-  const [newsletterEmail, setNewsletterEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
-
-  const handleNewsletterSubmit = async (event) => {
-    event.preventDefault();
-    setLoading(true);
-    setSuccess('');
-    setError('');
-
-    // Placeholder for API call
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
-      if (newsletterEmail.includes('@')) {
-        setSuccess('Subscribed to newsletter!');
-        setNewsletterEmail('');
-      } else {
-        setError('Please enter a valid email address.');
-      }
-    } catch (err) {
-      setError('Failed to subscribe. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <Box 
-      component="footer" 
-      sx={{ 
-        backgroundColor: 'background.default', 
-        borderTop: '1px solid #ddd',
-        py: 6, 
-        mt: 'auto' 
+    <Box
+      component="footer"
+      sx={{
+        bgcolor: '#FDFBF9',
+        pt: 10,
+        pb: 4,
+        borderTop: '1px solid rgba(201, 169, 110, 0.1)'
       }}
     >
       <Container maxWidth="lg">
-        <Grid container spacing={5}>
-          <Grid xs={12} sm={4}>
-            <Typography variant="h6" gutterBottom sx={{ fontFamily: 'Playfair Display, serif' }}>
-              Le Foyer
+        <Grid container spacing={8}>
+
+          {/* Column 1: Brand */}
+          <Grid item xs={12} md={4}>
+            <Typography
+              variant="h4"
+              sx={{
+                fontFamily: "'Cormorant Garamond', serif",
+                mb: 3,
+                letterSpacing: '0.05em'
+              }}
+            >
+              LE FOYER
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Rejuvenate Your Natural Beauty. Gentle, effective formulations with natural-inspired ingredients.
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, lineHeight: 1.8 }}>
+              Curating the finest natural beauty products for your daily ritual.
+              We believe in the power of nature to rejuvenate and restore.
             </Typography>
-            <Box sx={{ mt: 2 }}>
-              <IconButton href="https://instagram.com" target="_blank" color="inherit">
-                <Instagram />
+            <Stack direction="row" spacing={1}>
+              <IconButton size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+                <InstagramIcon />
               </IconButton>
-              <IconButton href="https://facebook.com" target="_blank" color="inherit">
-                <Facebook />
+              <IconButton size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+                <FacebookIcon />
               </IconButton>
-              <IconButton href="https://twitter.com" target="_blank" color="inherit">
-                <Twitter />
+              <IconButton size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+                <PinterestIcon />
               </IconButton>
-              <IconButton href="https://youtube.com" target="_blank" color="inherit">
-                <YouTube />
-              </IconButton>
-            </Box>
+            </Stack>
           </Grid>
-          <Grid xs={6} sm={2}>
-            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-              Quick Links
+
+          {/* Column 2: Shop */}
+          <Grid item xs={6} md={2}>
+            <Typography variant="h6" sx={{ mb: 3, fontSize: '0.875rem' }}>
+              SHOP
             </Typography>
-            <Link component={RouterLink} to="/products" color="text.secondary" display="block" underline="hover">Products</Link>
-            <Link component={RouterLink} to="/about" color="text.secondary" display="block" underline="hover">About</Link>
-            <Link component={RouterLink} to="/blog" color="text.secondary" display="block" underline="hover">Blog</Link>
-            <Link component={RouterLink} to="/faqs" color="text.secondary" display="block" underline="hover">FAQs</Link>
+            <Stack spacing={2}>
+              {['Skincare', 'Body Care', 'Hair Care', 'Sets & Bundles', 'New Arrivals'].map((item) => (
+                <Link
+                  key={item}
+                  href="#"
+                  color="text.secondary"
+                  underline="none"
+                  sx={{
+                    fontSize: '0.875rem',
+                    transition: 'color 0.2s',
+                    '&:hover': { color: 'primary.main' }
+                  }}
+                >
+                  {item}
+                </Link>
+              ))}
+            </Stack>
           </Grid>
-          <Grid xs={6} sm={3}>
-            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-              Customer Service
+
+          {/* Column 3: Support */}
+          <Grid item xs={6} md={2}>
+            <Typography variant="h6" sx={{ mb: 3, fontSize: '0.875rem' }}>
+              SUPPORT
             </Typography>
-            <Link component={RouterLink} to="/shipping-returns" color="text.secondary" display="block" underline="hover">Shipping & Returns</Link>
-            <Link component={RouterLink} to="/track-order" color="text.secondary" display="block" underline="hover">Track Order</Link>
-            <Link component={RouterLink} to="/contact" color="text.secondary" display="block" underline="hover">Contact Us</Link>
-            <Link component={RouterLink} to="/privacy-policy" color="text.secondary" display="block" underline="hover">Privacy Policy</Link>
-            <Link component={RouterLink} to="/terms-conditions" color="text.secondary" display="block" underline="hover">Terms & Conditions</Link>
+            <Stack spacing={2}>
+              {['Contact Us', 'Shipping & Returns', 'FAQ', 'Privacy Policy', 'Terms of Service'].map((item) => (
+                <Link
+                  key={item}
+                  href="#"
+                  color="text.secondary"
+                  underline="none"
+                  sx={{
+                    fontSize: '0.875rem',
+                    transition: 'color 0.2s',
+                    '&:hover': { color: 'primary.main' }
+                  }}
+                >
+                  {item}
+                </Link>
+              ))}
+            </Stack>
           </Grid>
-          <Grid xs={12} sm={3}>
-            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-              Contact Information
+
+          {/* Column 4: Newsletter */}
+          <Grid item xs={12} md={4}>
+            <Typography variant="h6" sx={{ mb: 3, fontSize: '0.875rem' }}>
+              NEWSLETTER
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Email: contact@lefoyerglobal.com
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Subscribe to receive updates, access to exclusive deals, and more.
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Phone: +91-XXXXXXXXXX
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Address: Surat, Gujarat, India
-            </Typography>
-            
-            {/* Newsletter Signup */}
-            <Box component="form" onSubmit={handleNewsletterSubmit} sx={{ mt: 3 }}>
-              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                Newsletter
-              </Typography>
-              <TextField
-                fullWidth
-                label="Your Email"
-                variant="outlined"
-                size="small"
-                value={newsletterEmail}
-                onChange={(e) => setNewsletterEmail(e.target.value)}
-                sx={{ mb: 1, '& fieldset': { borderColor: 'text.secondary' } }}
-                InputLabelProps={{ style: { color: 'text.secondary' } }}
-              />
-              <Button 
-                fullWidth 
-                variant="contained" 
-                color="primary" 
-                type="submit"
-                disabled={loading}
-                sx={{ borderRadius: '25px', py: 1 }}
-              >
-                {loading ? <CircularProgress size={20} color="inherit" /> : 'Subscribe'}
-              </Button>
-              {success && <Alert severity="success" sx={{ mt: 1 }}>{success}</Alert>}
-              {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+            <Box component="form" noValidate autoComplete="off">
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  placeholder="Your email address"
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 0,
+                      bgcolor: 'white',
+                      '& fieldset': { borderColor: '#E8E8E8' },
+                      '&:hover fieldset': { borderColor: '#C9A96E' },
+                    }
+                  }}
+                />
+                <Button
+                  variant="contained"
+                  disableElevation
+                  sx={{
+                    minWidth: '100px',
+                    bgcolor: 'primary.main',
+                    '&:hover': { bgcolor: 'primary.dark' }
+                  }}
+                >
+                  JOIN
+                </Button>
+              </Stack>
             </Box>
           </Grid>
         </Grid>
-        <Divider sx={{ my: 3 }} />
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            © {new Date().getFullYear()} Le Foyer Global. All Rights Reserved.
+
+        <Box sx={{ mt: 10, pt: 3, borderTop: '1px solid #E8E8E8', textAlign: 'center' }}>
+          <Typography variant="caption" color="text.secondary">
+            © {new Date().getFullYear()} Le foyeR. Global. All rights reserved.
           </Typography>
-          <Box sx={{ mt: 2 }}>
-            <IconButton><CreditCard sx={{ color: 'text.secondary' }} /></IconButton>
-            <IconButton><Payment sx={{ color: 'text.secondary' }} /></IconButton>
-            {/* Add more payment icons as needed */}
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ee/UPI-Logo-vector.svg/1200px-UPI-Logo-vector.svg.png" alt="UPI" style={{ height: 24, marginLeft: 8, verticalAlign: 'middle' }} />
-          </Box>
         </Box>
       </Container>
     </Box>

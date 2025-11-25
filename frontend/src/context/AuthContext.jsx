@@ -1,50 +1,66 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import api from '../services/api';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { loginUser as mockLogin, getCurrentUser } from '../services/mockApi';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('authToken'));
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // Here you would typically fetch the user profile
-      // For now, we'll just assume the token is valid
+    // Check for existing token
+    const savedToken = localStorage.getItem('authToken');
+    const savedUser = localStorage.getItem('user');
+    
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setUser(JSON.parse(savedUser));
     }
-  }, [token]);
+    setLoading(false);
+  }, []);
 
-  const login = async (newToken) => {
-    localStorage.setItem('authToken', newToken);
-    setToken(newToken);
-    api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    // Fetch user profile and setUser
+  const login = async (credentials) => {
+    try {
+      const response = await mockLogin(credentials);
+      const { access, user: userData } = response.data;
+      
+      setToken(access);
+      setUser(userData);
+      localStorage.setItem('authToken', access);
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      return true;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
+    }
   };
 
   const logout = () => {
-    localStorage.removeItem('authToken');
     setUser(null);
     setToken(null);
-    delete api.defaults.headers.common['Authorization'];
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('wishlist');
   };
 
-  const authContextValue = {
+  const value = {
     user,
     token,
+    loading,
     login,
     logout,
+    isAuthenticated: !!token
   };
 
-  return (
-    <AuthContext.Provider value={authContextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
 };
-
-
