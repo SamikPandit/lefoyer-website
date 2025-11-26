@@ -20,7 +20,7 @@ const Footer = () => {
         <Grid container spacing={8}>
 
           {/* Column 1: Brand */}
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={5}>
             <Typography
               variant="h4"
               sx={{
@@ -48,32 +48,8 @@ const Footer = () => {
             </Stack>
           </Grid>
 
-          {/* Column 2: Shop */}
-          <Grid item xs={6} md={2}>
-            <Typography variant="h6" sx={{ mb: 3, fontSize: '0.875rem' }}>
-              SHOP
-            </Typography>
-            <Stack spacing={2}>
-              {['Skincare', 'Body Care', 'Hair Care', 'Sets & Bundles', 'New Arrivals'].map((item) => (
-                <Link
-                  key={item}
-                  href="#"
-                  color="text.secondary"
-                  underline="none"
-                  sx={{
-                    fontSize: '0.875rem',
-                    transition: 'color 0.2s',
-                    '&:hover': { color: 'primary.main' }
-                  }}
-                >
-                  {item}
-                </Link>
-              ))}
-            </Stack>
-          </Grid>
-
-          {/* Column 3: Support */}
-          <Grid item xs={6} md={2}>
+          {/* Column 2: Support */}
+          <Grid item xs={12} md={2}>
             <Typography variant="h6" sx={{ mb: 3, fontSize: '0.875rem' }}>
               SUPPORT
             </Typography>
@@ -81,7 +57,7 @@ const Footer = () => {
               {['Contact Us', 'Shipping & Returns', 'FAQ', 'Privacy Policy', 'Terms of Service'].map((item) => (
                 <Link
                   key={item}
-                  href="#"
+                  href={item === 'Privacy Policy' ? '#/privacy-policy' : item === 'Terms of Service' ? '#/terms' : item === 'Shipping & Returns' ? '#/shipping-returns' : '#'}
                   color="text.secondary"
                   underline="none"
                   sx={{
@@ -96,8 +72,8 @@ const Footer = () => {
             </Stack>
           </Grid>
 
-          {/* Column 4: Newsletter */}
-          <Grid item xs={12} md={4}>
+          {/* Column 3: Newsletter */}
+          <Grid item xs={12} md={5}>
             <Typography variant="h6" sx={{ mb: 3, fontSize: '0.875rem' }}>
               NEWSLETTER
             </Typography>

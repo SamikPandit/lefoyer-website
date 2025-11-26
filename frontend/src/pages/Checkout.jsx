@@ -1,302 +1,201 @@
 import React, { useState } from 'react';
-import { Container, Box, Typography, Button, Stepper, Step, StepLabel, TextField, FormControlLabel, RadioGroup, Radio, Paper, Divider, CircularProgress, Alert } from '@mui/material';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Container, Typography, Box, Grid, TextField, Button, Paper, Radio, RadioGroup, FormControlLabel, Divider, Stepper, Step, StepLabel } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { createOrder } from '../services/api';
-
-const steps = ['Shipping Information', 'Shipping Method', 'Payment Method', 'Order Review'];
 
 const Checkout = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { cart, cartTotal, clearCart } = useCart();
-  const { couponDiscount } = location.state || { couponDiscount: 0 };
-
-  const [activeStep, setActiveStep] = useState(0);
-  const [shippingInfo, setShippingInfo] = useState({
-    firstName: '',
-    lastName: '',
-    address: '',
-    city: '',
-    state: '',
-    pincode: '',
-    phone: '',
-    email: '',
-  });
-  const [shippingMethod, setShippingMethod] = useState('standard');
-  const [paymentMethod, setPaymentMethod] = useState('cod');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const estimatedShipping = 50; // Static for now
-  const totalWithShipping = cartTotal + estimatedShipping;
-  const finalTotal = totalWithShipping - (totalWithShipping * (couponDiscount / 100));
-
-  const handleNext = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
-  };
-
-  const handleShippingInfoChange = (event) => {
-    setShippingInfo({
-      ...shippingInfo,
-      [event.target.name]: event.target.value,
+    const { cart, clearCart } = useCart();
+    const navigate = useNavigate();
+    const [activeStep, setActiveStep] = useState(0);
+    const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        zip: '',
+        paymentMethod: 'card'
     });
-  };
 
-  const handlePlaceOrder = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const orderData = {
-        shipping_info: {
-          first_name: shippingInfo.firstName,
-          last_name: shippingInfo.lastName,
-          address: shippingInfo.address,
-          city: shippingInfo.city,
-          state: shippingInfo.state,
-          pincode: shippingInfo.pincode,
-          phone: shippingInfo.phone,
-          email: shippingInfo.email,
-        },
-        coupon_code: location.state?.couponCode || null, // Pass coupon code if applied
-      };
-      const response = await createOrder(orderData);
-      clearCart(); // Clear cart after successful order
-      navigate('/order-confirmation', { state: { orderId: response.data.id, total: finalTotal } });
-    } catch (err) {
-      setError('Failed to place order. Please try again.');
-      console.error(err);
-    } finally {
-      setLoading(false);
+    if (cart.items.length === 0) {
+        navigate('/cart');
+        return null;
     }
-  };
 
-  const getStepContent = (step) => {
-    switch (step) {
-      case 0:
-        return (
-          <Box component="form" sx={{ mt: 3 }}>
-            <Grid container spacing={2}>
-              <Grid xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  label="First Name"
-                  name="firstName"
-                  value={shippingInfo.firstName}
-                  onChange={handleShippingInfoChange}
-                />
-              </Grid>
-              <Grid xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  label="Last Name"
-                  name="lastName"
-                  value={shippingInfo.lastName}
-                  onChange={handleShippingInfoChange}
-                />
-              </Grid>
-              <Grid xs={12}>
-                <TextField
-                  required
-                  fullWidth
-                  label="Address"
-                  name="address"
-                  value={shippingInfo.address}
-                  onChange={handleShippingInfoChange}
-                />
-              </Grid>
-              <Grid xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  label="City"
-                  name="city"
-                  value={shippingInfo.city}
-                  onChange={handleShippingInfoChange}
-                />
-              </Grid>
-              <Grid xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  label="State"
-                  name="state"
-                  value={shippingInfo.state}
-                  onChange={handleShippingInfoChange}
-                />
-              </Grid>
-              <Grid xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  label="Pincode"
-                  name="pincode"
-                  value={shippingInfo.pincode}
-                  onChange={handleShippingInfoChange}
-                />
-              </Grid>
-              <Grid xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  label="Phone Number"
-                  name="phone"
-                  value={shippingInfo.phone}
-                  onChange={handleShippingInfoChange}
-                />
-              </Grid>
-              <Grid xs={12}>
-                <TextField
-                  required
-                  fullWidth
-                  label="Email Address"
-                  name="email"
-                  type="email"
-                  value={shippingInfo.email}
-                  onChange={handleShippingInfoChange}
-                />
-              </Grid>
-            </Grid>
-          </Box>
-        );
-      case 1:
-        return (
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom>Select Shipping Method</Typography>
-            <RadioGroup
-              name="shippingMethod"
-              value={shippingMethod}
-              onChange={(e) => setShippingMethod(e.target.value)}
-            >
-              <FormControlLabel value="standard" control={<Radio />} label="Standard Shipping (₹50)" />
-              <FormControlLabel value="express" control={<Radio />} label="Express Shipping (₹100)" />
-            </RadioGroup>
-          </Box>
-        );
-      case 2:
-        return (
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom>Select Payment Method</Typography>
-            <RadioGroup
-              name="paymentMethod"
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-            >
-              <FormControlLabel value="cod" control={<Radio />} label="Cash on Delivery" />
-              <FormControlLabel value="card" control={<Radio />} label="Credit/Debit Card (UI Only)" disabled />
-              <FormControlLabel value="upi" control={<Radio />} label="UPI (UI Only)" disabled />
-            </RadioGroup>
-          </Box>
-        );
-      case 3:
-        return (
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom>Order Summary</Typography>
-            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>Shipping To:</Typography>
-              <Typography>{shippingInfo.firstName} {shippingInfo.lastName}</Typography>
-              <Typography>{shippingInfo.address}, {shippingInfo.city}</Typography>
-              <Typography>{shippingInfo.state} - {shippingInfo.pincode}</Typography>
-              <Typography>Phone: {shippingInfo.phone}</Typography>
-              <Typography>Email: {shippingInfo.email}</Typography>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>Shipping Method:</Typography>
-              <Typography>{shippingMethod === 'standard' ? 'Standard Shipping' : 'Express Shipping'}</Typography>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>Payment Method:</Typography>
-              <Typography>{paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod === 'card' ? 'Credit/Debit Card' : 'UPI'}</Typography>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>Items:</Typography>
-              {cart?.items.map((item) => (
-                <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                  <Typography variant="body2">{item.product.name} x {item.quantity}</Typography>
-                  <Typography variant="body2">₹{(item.product.price * item.quantity).toFixed(2)}</Typography>
-                </Box>
-              ))}
-              <Divider sx={{ my: 2 }} />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body1">Subtotal:</Typography>
-                <Typography variant="body1">₹{cartTotal.toFixed(2)}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body1">Shipping:</Typography>
-                <Typography variant="body1">₹{estimatedShipping.toFixed(2)}</Typography>
-              </Box>
-              {couponDiscount > 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, color: 'success.main' }}>
-                  <Typography variant="body1">Coupon Discount ({couponDiscount}%):</Typography>
-                  <Typography variant="body1">-₹{(totalWithShipping * (couponDiscount / 100)).toFixed(2)}</Typography>
-                </Box>
-              )}
-              <Divider sx={{ my: 2 }} />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Order Total:</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>₹{finalTotal.toFixed(2)}</Typography>
-              </Box>
-            </Paper>
-          </Box>
-        );
-      default:
-        return 'Unknown step';
-    }
-  };
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
 
-  if (!cart || cart.items.length === 0) {
+    const handleNext = () => {
+        setActiveStep((prev) => prev + 1);
+    };
+
+    const handleBack = () => {
+        setActiveStep((prev) => prev - 1);
+    };
+
+    const handlePlaceOrder = () => {
+        // Simulate order placement
+        setTimeout(() => {
+            clearCart();
+            navigate('/order-confirmation');
+        }, 1500);
+    };
+
+    const steps = ['Shipping Address', 'Payment Details', 'Review Order'];
+
     return (
-      <Container maxWidth="lg" sx={{ py: 5, textAlign: 'center' }}>
-        <Typography variant="h5" gutterBottom>Your cart is empty</Typography>
-        <Button variant="contained" component={Link} to="/products">Continue Shopping</Button>
-      </Container>
-    );
-  }
+        <Box sx={{ backgroundColor: '#FAFAFA', minHeight: '100vh', py: 4 }}>
+            <Container maxWidth="lg">
+                <Typography variant="h3" sx={{ fontFamily: "'Cormorant Garamond', serif", mb: 4, textAlign: 'center' }}>
+                    Checkout
+                </Typography>
 
-  return (
-    <Container maxWidth="md" sx={{ py: 5 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontFamily: 'Playfair Display, serif', fontWeight: 700, mb: 4 }}>
-        Checkout
-      </Typography>
-      <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-        {steps.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
+                <Stepper activeStep={activeStep} sx={{ mb: 6, maxWidth: 800, mx: 'auto' }}>
+                    {steps.map((label) => (
+                        <Step key={label}>
+                            <StepLabel>{label}</StepLabel>
+                        </Step>
+                    ))}
+                </Stepper>
 
-      <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        {getStepContent(activeStep)}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
-          {activeStep !== 0 && (
-            <Button onClick={handleBack} sx={{ mr: 1, borderRadius: '25px' }}>
-              Back
-            </Button>
-          )}
-          {activeStep === steps.length - 1 ? (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handlePlaceOrder}
-              disabled={loading}
-              sx={{ borderRadius: '25px', px: 4, py: 1.5 }}
-            >
-              {loading ? <CircularProgress size={24} /> : 'Place Order'}
-            </Button>
-          ) : (
-            <Button variant="contained" color="primary" onClick={handleNext} sx={{ borderRadius: '25px', px: 4, py: 1.5 }}>
-              Next
-            </Button>
-          )}
+                <Grid container spacing={4}>
+                    <Grid item xs={12} md={8}>
+                        <Paper elevation={0} sx={{ p: 4, borderRadius: 2, border: '1px solid #E0E0E0' }}>
+                            {activeStep === 0 && (
+                                <Box>
+                                    <Typography variant="h6" sx={{ mb: 3 }}>Contact Information</Typography>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField fullWidth label="First Name" name="firstName" value={formData.firstName} onChange={handleInputChange} required />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField fullWidth label="Last Name" name="lastName" value={formData.lastName} onChange={handleInputChange} required />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField fullWidth label="Email" name="email" type="email" value={formData.email} onChange={handleInputChange} required />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField fullWidth label="Phone" name="phone" value={formData.phone} onChange={handleInputChange} required />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField fullWidth label="Address" name="address" value={formData.address} onChange={handleInputChange} required />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField fullWidth label="City" name="city" value={formData.city} onChange={handleInputChange} required />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField fullWidth label="State" name="state" value={formData.state} onChange={handleInputChange} required />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField fullWidth label="ZIP Code" name="zip" value={formData.zip} onChange={handleInputChange} required />
+                                        </Grid>
+                                    </Grid>
+                                    <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                                        <Button variant="contained" onClick={handleNext} sx={{ backgroundColor: '#C9A96E', '&:hover': { backgroundColor: '#B08D55' } }}>
+                                            Continue to Payment
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            )}
+
+                            {activeStep === 1 && (
+                                <Box>
+                                    <Typography variant="h6" sx={{ mb: 3 }}>Payment Method</Typography>
+                                    <RadioGroup name="paymentMethod" value={formData.paymentMethod} onChange={handleInputChange}>
+                                        <FormControlLabel value="card" control={<Radio />} label="Credit / Debit Card" />
+                                        <FormControlLabel value="upi" control={<Radio />} label="UPI" />
+                                        <FormControlLabel value="cod" control={<Radio />} label="Cash on Delivery" />
+                                    </RadioGroup>
+
+                                    {formData.paymentMethod === 'card' && (
+                                        <Box sx={{ mt: 3, p: 3, backgroundColor: '#F5F5F5', borderRadius: 1 }}>
+                                            <Grid container spacing={2}>
+                                                <Grid item xs={12}>
+                                                    <TextField fullWidth label="Card Number" placeholder="0000 0000 0000 0000" />
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <TextField fullWidth label="Expiry Date" placeholder="MM/YY" />
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <TextField fullWidth label="CVV" type="password" />
+                                                </Grid>
+                                            </Grid>
+                                        </Box>
+                                    )}
+
+                                    <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
+                                        <Button onClick={handleBack}>Back</Button>
+                                        <Button variant="contained" onClick={handleNext} sx={{ backgroundColor: '#C9A96E', '&:hover': { backgroundColor: '#B08D55' } }}>
+                                            Review Order
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            )}
+
+                            {activeStep === 2 && (
+                                <Box>
+                                    <Typography variant="h6" sx={{ mb: 3 }}>Review Order</Typography>
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="subtitle2" color="text.secondary">Shipping To:</Typography>
+                                        <Typography>{formData.firstName} {formData.lastName}</Typography>
+                                        <Typography>{formData.address}, {formData.city}, {formData.state} {formData.zip}</Typography>
+                                        <Typography>{formData.phone}</Typography>
+                                    </Box>
+
+                                    <Divider sx={{ my: 2 }} />
+
+                                    <Box sx={{ mb: 3 }}>
+                                        {cart.items.map((item) => (
+                                            <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                                <Typography>{item.name} x {item.quantity}</Typography>
+                                                <Typography>₹{item.price * item.quantity}</Typography>
+                                            </Box>
+                                        ))}
+                                    </Box>
+
+                                    <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
+                                        <Button onClick={handleBack}>Back</Button>
+                                        <Button
+                                            variant="contained"
+                                            onClick={handlePlaceOrder}
+                                            size="large"
+                                            disabled
+                                            sx={{ backgroundColor: '#C9A96E', '&:hover': { backgroundColor: '#B08D55' }, px: 4 }}
+                                        >
+                                            Place Order (Coming Soon)
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            )}
+                        </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} md={4}>
+                        <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid #E0E0E0', backgroundColor: '#fff' }}>
+                            <Typography variant="h6" sx={{ mb: 2 }}>Order Summary</Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                <Typography color="text.secondary">Items ({cart.count})</Typography>
+                                <Typography>₹{cart.total}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                <Typography color="text.secondary">Shipping</Typography>
+                                <Typography color="success.main">Free</Typography>
+                            </Box>
+                            <Divider sx={{ my: 2 }} />
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="h6">Total</Typography>
+                                <Typography variant="h6" color="primary.main">₹{cart.total}</Typography>
+                            </Box>
+                        </Paper>
+                    </Grid>
+                </Grid>
+            </Container>
         </Box>
-      </Paper>
-    </Container>
-  );
+    );
 };
 
 export default Checkout;

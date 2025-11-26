@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
-import { Card, CardMedia, CardContent, Typography, Box, IconButton, Button, Rating, Chip } from '@mui/material';
+import { Card, CardMedia, CardContent, Typography, Box, IconButton, Button, Rating, Chip, Snackbar, Alert } from '@mui/material';
+import { useCart } from '../../context/CartContext';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import { Link } from 'react-router-dom';
 
 const ProductCard = ({ product }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const { addToCart } = useCart();
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+
+  const handleQuickAdd = (e) => {
+    e.preventDefault(); // Prevent navigation to product detail
+    e.stopPropagation();
+    addToCart(product, 1);
+    setOpenSnackbar(true);
+  };
 
   // Fallback if product is undefined or missing properties
   if (!product) return null;
@@ -171,6 +181,7 @@ const ProductCard = ({ product }) => {
                   color: 'white',
                 }
               }}
+              onClick={handleQuickAdd}
             >
               Quick Add
             </Button>
@@ -229,6 +240,16 @@ const ProductCard = ({ product }) => {
           ₹{price}
         </Typography>
       </CardContent>
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={2000}
+        onClose={() => setOpenSnackbar(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" sx={{ width: '100%' }}>
+          Added to cart
+        </Alert>
+      </Snackbar>
     </Card>
   );
 };

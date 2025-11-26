@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { 
-  Container, 
-  Grid, 
-  Box, 
-  Typography, 
-  Button, 
-  IconButton, 
-  Tabs, 
+import {
+  Container,
+  Grid,
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  Tabs,
   Tab,
   Rating,
   Divider,
@@ -19,10 +19,10 @@ import {
   Alert,
   Snackbar
 } from '@mui/material';
-import { 
-  Add, 
-  Remove, 
-  FavoriteBorder, 
+import {
+  Add,
+  Remove,
+  FavoriteBorder,
   Favorite,
   LocalShipping,
   Verified,
@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import { getProductBySlug } from '../services/mockApi';
 import { useWishlist } from '../context/WishlistContext';
+import { useCart } from '../context/CartContext';
 import RelatedProducts from '../components/product/RelatedProducts';
 import ProductReviews from '../components/product/ProductReviews';
 
@@ -42,8 +43,9 @@ const ProductDetail = () => {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [isWishlisted, setIsWishlisted] = useState(false);
-  
+
   const { wishlist, addToWishlist, removeFromWishlist } = useWishlist();
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -81,6 +83,12 @@ const ProductDetail = () => {
       success = await addToWishlist(product.id);
       setSnackbarMessage(success ? 'Added to wishlist' : 'Failed');
     }
+    setOpenSnackbar(true);
+  };
+
+  const handleAddToCart = () => {
+    addToCart(product, quantity);
+    setSnackbarMessage('Added to cart');
     setOpenSnackbar(true);
   };
 
@@ -125,9 +133,9 @@ const ProductDetail = () => {
                       '&:hover': { borderColor: '#C9A96E' },
                     }}
                   >
-                    <img 
-                      src={image} 
-                      alt={`Product ${index + 1}`} 
+                    <img
+                      src={image}
+                      alt={`Product ${index + 1}`}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </Box>
@@ -148,12 +156,12 @@ const ProductDetail = () => {
                   backgroundColor: '#F5F5F5',
                 }}
               >
-                <img 
-                  src={selectedImage} 
-                  alt={product.name} 
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
+                <img
+                  src={selectedImage}
+                  alt={product.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
                     objectFit: 'contain',
                     padding: '20px'
                   }}
@@ -254,9 +262,23 @@ const ProductDetail = () => {
 
                 {/* Action Buttons */}
                 <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
-                  <IconButton 
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    size="large"
+                    onClick={handleAddToCart}
+                    sx={{
+                      backgroundColor: '#C9A96E',
+                      '&:hover': { backgroundColor: '#B08D55' },
+                      textTransform: 'none',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    Add to Cart
+                  </Button>
+                  <IconButton
                     onClick={handleToggleWishlist}
-                    sx={{ 
+                    sx={{
                       border: '1px solid #D5D9D9',
                       borderRadius: 1,
                       '&:hover': { backgroundColor: '#F7F7F7' }
@@ -298,8 +320,8 @@ const ProductDetail = () => {
 
         {/* Product Details Tabs */}
         <Box sx={{ backgroundColor: 'white', mb: 3 }}>
-          <Tabs 
-            value={activeTab} 
+          <Tabs
+            value={activeTab}
             onChange={handleTabChange}
             sx={{
               borderBottom: '1px solid #E0E0E0',
@@ -310,7 +332,7 @@ const ProductDetail = () => {
             <Tab label="Ingredients" />
             <Tab label="How to Use" />
           </Tabs>
-          
+
           <Box sx={{ p: 3 }}>
             {activeTab === 0 && (
               <Box>
@@ -343,7 +365,7 @@ const ProductDetail = () => {
                     </TableRow>
                   </TableBody>
                 </Table>
-                
+
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 600 }}>Description</Typography>
                   <Typography variant="body2" sx={{ lineHeight: 1.8 }}>
@@ -352,7 +374,7 @@ const ProductDetail = () => {
                 </Box>
               </Box>
             )}
-            
+
             {activeTab === 1 && (
               <Box>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Ingredients</Typography>
@@ -361,7 +383,7 @@ const ProductDetail = () => {
                 </Typography>
               </Box>
             )}
-            
+
             {activeTab === 2 && (
               <Box>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>How to Use</Typography>

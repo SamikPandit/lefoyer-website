@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppBar, Toolbar, Typography, Box, IconButton, Badge, Drawer, List, ListItem, ListItemText, useScrollTrigger, Slide, Container } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
+import { useCart } from '../../context/CartContext';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
@@ -11,6 +12,7 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { cart } = useCart();
   const isHome = location.pathname === '/';
 
   // Handle scroll effect
@@ -27,9 +29,9 @@ const Navbar = () => {
   };
 
   const navLinks = [
-    { title: 'Shop', path: '/products' },
+    { title: 'Products', path: '/products' },
     { title: 'About', path: '/about' },
-    { title: 'Journal', path: '/journal' },
+    { title: 'Contact', path: '/contact' },
   ];
 
   return (
@@ -46,18 +48,20 @@ const Navbar = () => {
         }}
       >
         <Container maxWidth="xl">
-          <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 0 } }}>
+          <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 1, md: 2 } }}>
 
-            {/* Mobile Menu Icon */}
-            <IconButton
-              color="inherit"
-              aria-label="open drawer"
-              edge="start"
-              onClick={handleDrawerToggle}
-              sx={{ display: { md: 'none' }, color: 'text.primary' }}
-            >
-              <MenuIcon />
-            </IconButton>
+            {/* Mobile Menu Icon - Left */}
+            <Box sx={{ display: { xs: 'flex', md: 'none' }, flex: 1, justifyContent: 'flex-start' }}>
+              <IconButton
+                color="inherit"
+                aria-label="open drawer"
+                edge="start"
+                onClick={handleDrawerToggle}
+                sx={{ color: 'text.primary' }}
+              >
+                <MenuIcon />
+              </IconButton>
+            </Box>
 
             {/* Desktop Left Links */}
             <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 4, flex: 1 }}>
@@ -94,7 +98,7 @@ const Navbar = () => {
               ))}
             </Box>
 
-            {/* Logo */}
+            {/* Logo - Center */}
             <Typography
               variant="h4"
               component={Link}
@@ -108,21 +112,22 @@ const Navbar = () => {
                 fontWeight: 600,
                 letterSpacing: '0.05em',
                 fontSize: { xs: '1.75rem', md: '2.5rem' },
+                whiteSpace: 'nowrap',
               }}
             >
               LE FOYER
             </Typography>
 
             {/* Right Icons */}
-            <Box sx={{ display: 'flex', gap: { xs: 1, md: 2 }, flex: 1, justifyContent: 'flex-end' }}>
+            <Box sx={{ display: 'flex', gap: { xs: 0.5, md: 2 }, flex: 1, justifyContent: 'flex-end' }}>
               <IconButton sx={{ color: 'text.primary' }}>
                 <SearchIcon />
               </IconButton>
-              <IconButton component={Link} to="/account" sx={{ color: 'text.primary', display: { xs: 'none', sm: 'flex' } }}>
+              <IconButton component={Link} to="/login" sx={{ color: 'text.primary', display: { xs: 'none', sm: 'flex' } }}>
                 <PersonOutlineIcon />
               </IconButton>
               <IconButton component={Link} to="/cart" sx={{ color: 'text.primary' }}>
-                <Badge badgeContent={2} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
+                <Badge badgeContent={cart?.count || 0} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
                   <ShoppingBagOutlinedIcon />
                 </Badge>
               </IconButton>
@@ -172,12 +177,12 @@ const Navbar = () => {
           <ListItem disablePadding sx={{ mt: 4 }}>
             <Typography
               component={Link}
-              to="/account"
+              to="/login"
               onClick={handleDrawerToggle}
               variant="body1"
               sx={{ textDecoration: 'none', color: 'text.secondary' }}
             >
-              My Account
+              Sign In
             </Typography>
           </ListItem>
         </List>

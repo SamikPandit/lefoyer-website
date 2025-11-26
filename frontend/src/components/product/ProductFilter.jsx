@@ -53,7 +53,7 @@ const ProductFilter = ({ filters, onFilterChange }) => {
   const handlePriceChange = (event, newValue) => {
     setPriceRange(newValue);
   };
-  
+
   const handlePriceChangeCommitted = (event, newValue) => {
     onFilterChange({ ...filters, min_price: newValue[0], max_price: newValue[1] });
   };
@@ -64,41 +64,7 @@ const ProductFilter = ({ filters, onFilterChange }) => {
 
   return (
     <Box>
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.938rem' }}>
-        Category
-      </Typography>
-      <List dense sx={{ py: 0 }}>
-        {categories.map((category) => (
-          <ListItem key={category.id} disablePadding sx={{ py: 0.25 }}>
-            <Checkbox
-              edge="start"
-              checked={filters.category?.includes(category.id) || false}
-              onChange={() => handleCategoryChange(category.id)}
-              size="small"
-            />
-            <ListItemText primary={category.name} primaryTypographyProps={{ fontSize: '0.875rem' }} />
-          </ListItem>
-        ))}
-      </List>
-      <Divider sx={{ my: 2 }} />
 
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.938rem' }}>
-        Sub-Category
-      </Typography>
-      <List dense sx={{ py: 0 }}>
-        {subCategories.map((subCategory) => (
-          <ListItem key={subCategory.id} disablePadding sx={{ py: 0.25 }}>
-            <Checkbox
-              edge="start"
-              checked={filters.sub_category?.includes(subCategory.id) || false}
-              onChange={() => handleSubCategoryChange(subCategory.id)}
-              size="small"
-            />
-            <ListItemText primary={subCategory.name} primaryTypographyProps={{ fontSize: '0.875rem' }} />
-          </ListItem>
-        ))}
-      </List>
-      <Divider sx={{ my: 2 }} />
 
       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.938rem' }}>
         Suitable For

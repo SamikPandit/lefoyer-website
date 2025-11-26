@@ -7,29 +7,44 @@ import SignUp from './pages/SignUp';
 import Wishlist from './pages/Wishlist';
 import OrderConfirmation from './pages/OrderConfirmation';
 import About from './pages/About';
+import ShippingPolicy from './pages/ShippingPolicy';
+import TermsAndConditions from './pages/TermsAndConditions';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
 import Layout from './components/layout/Layout';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
+import { CartProvider } from './context/CartContext';
+import ScrollToTop from './components/common/ScrollToTop';
 
 function App() {
   return (
     <AuthProvider>
       <WishlistProvider>
-        <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/products" element={<ProductListing />} />
-              <Route path="/product/:slug" element={<ProductDetail />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/wishlist" element={<Wishlist />} />
-              <Route path="/order-confirmation" element={<OrderConfirmation />} />
-              <Route path="/about" element={<About />} />
-              <Route path="*" element={<div>Page not found</div>} />
-            </Routes>
-          </Layout>
-        </Router>
+        <CartProvider>
+          <Router>
+            <ScrollToTop />
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/products" element={<ProductListing />} />
+                <Route path="/product/:slug" element={<ProductDetail />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/wishlist" element={<Wishlist />} />
+                <Route path="/order-confirmation" element={<OrderConfirmation />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/shipping-returns" element={<ShippingPolicy />} />
+                <Route path="/terms" element={<TermsAndConditions />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="*" element={<div>Page not found</div>} />
+              </Routes>
+            </Layout>
+          </Router>
+        </CartProvider>
       </WishlistProvider>
     </AuthProvider>
   );
