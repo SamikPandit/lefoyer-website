@@ -93,6 +93,18 @@ const TermsAndConditions = () => {
                         <ListItem sx={{ display: 'list-item' }}>
                             <ListItemText primary="All concerns or communications relating to these Terms must be communicated to us using the contact information provided on this website." />
                         </ListItem>
+                        <ListItem sx={{ display: 'list-item' }}>
+                            <ListItemText
+                                primary="Contact Information:"
+                                secondary={
+                                    <React.Fragment>
+                                        <Typography component="span" variant="body2" display="block">Business Name: SITE COBALLO PRIVATE LIMITED</Typography>
+                                        <Typography component="span" variant="body2" display="block">Phone: 8401825693</Typography>
+                                        <Typography component="span" variant="body2" display="block">Email: scpl25693@gmail.com</Typography>
+                                    </React.Fragment>
+                                }
+                            />
+                        </ListItem>
                     </List>
                 </Paper>
             </Container>

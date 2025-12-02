@@ -2,33 +2,31 @@ import React from 'react';
 import Slider from 'react-slick';
 import { Box, Typography, Container, Avatar, Rating } from '@mui/material';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
-import "slick-carousel/slick/slick.css"; 
+import PersonIcon from '@mui/icons-material/Person';
+import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 
 const testimonials = [
   {
     id: 1,
-    name: 'Sarah P.',
+    name: 'Priya Sharma',
     title: 'Beauty Enthusiast',
     rating: 5,
     quote: 'The body care products are luxurious and leave my skin feeling incredibly soft and hydrated. The scents are subtle and beautiful. My skin has never felt so pampered!',
-    avatar: 'https://randomuser.me/api/portraits/women/65.jpg',
   },
   {
     id: 2,
-    name: 'Jessica L.',
+    name: 'Anjali Patel',
     title: 'Verified Buyer',
     rating: 5,
     quote: 'Le foyeR. products have transformed my skin! I love the natural ingredients and how gentle they are. My skin has never felt so soft and looked so radiant.',
-    avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
   },
   {
     id: 3,
-    name: 'David C.',
+    name: 'Rahul Verma',
     title: 'Happy Customer',
     rating: 5,
     quote: 'Finally, a brand that delivers on its promises. My hair feels amazing after using their haircare range. It\'s stronger, shinier, and much more manageable.',
-    avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
   },
 ];
 
@@ -62,12 +60,12 @@ const CustomerTestimonials = () => {
           >
             Testimonials
           </Typography>
-          
-          <Typography 
-            variant="h2" 
-            component="h2" 
+
+          <Typography
+            variant="h2"
+            component="h2"
             gutterBottom
-            sx={{ 
+            sx={{
               color: 'text.primary',
               mb: 2,
               position: 'relative',
@@ -86,10 +84,10 @@ const CustomerTestimonials = () => {
           >
             What Our Customers Say
           </Typography>
-          
-          <Typography 
-            variant="body1" 
-            color="text.secondary" 
+
+          <Typography
+            variant="body1"
+            color="text.secondary"
             sx={{ maxWidth: 500, mx: 'auto', mt: 3 }}
           >
             Real experiences from our beloved community
@@ -97,8 +95,8 @@ const CustomerTestimonials = () => {
         </Box>
 
         {/* Testimonials Carousel */}
-        <Box 
-          sx={{ 
+        <Box
+          sx={{
             '& .custom-dots': {
               bottom: '-40px',
               '& li': {
@@ -126,20 +124,20 @@ const CustomerTestimonials = () => {
                   }}
                 >
                   {/* Quote Icon */}
-                  <FormatQuoteIcon 
-                    sx={{ 
-                      fontSize: 72, 
+                  <FormatQuoteIcon
+                    sx={{
+                      fontSize: 72,
                       color: 'secondary.main',
                       opacity: 0.3,
                       mb: 3,
-                    }} 
+                    }}
                   />
 
                   {/* Rating */}
-                  <Rating 
-                    value={testimonial.rating} 
-                    readOnly 
-                    sx={{ 
+                  <Rating
+                    value={testimonial.rating}
+                    readOnly
+                    sx={{
                       mb: 3,
                       '& .MuiRating-iconFilled': {
                         color: '#C9A96E',
@@ -149,9 +147,9 @@ const CustomerTestimonials = () => {
                   />
 
                   {/* Quote Text */}
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
+                  <Typography
+                    variant="h6"
+                    sx={{
                       fontFamily: 'Cormorant Garamond, serif',
                       fontStyle: 'italic',
                       mb: 4,
@@ -165,22 +163,24 @@ const CustomerTestimonials = () => {
                   </Typography>
 
                   {/* Avatar & Name */}
-                  <Avatar 
-                    src={testimonial.avatar} 
-                    alt={testimonial.name} 
-                    sx={{ 
-                      width: 72, 
-                      height: 72, 
+                  <Avatar
+                    sx={{
+                      width: 72,
+                      height: 72,
                       mx: 'auto',
                       mb: 2,
                       border: '3px solid',
                       borderColor: 'secondary.light',
+                      bgcolor: 'grey.200',
+                      color: 'text.secondary'
                     }}
-                  />
+                  >
+                    <PersonIcon sx={{ fontSize: 40 }} />
+                  </Avatar>
 
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
+                  <Typography
+                    variant="h6"
+                    sx={{
                       fontWeight: 500,
                       color: 'text.primary',
                       mb: 0.5,
@@ -188,9 +188,9 @@ const CustomerTestimonials = () => {
                   >
                     {testimonial.name}
                   </Typography>
-                  
-                  <Typography 
-                    variant="caption" 
+
+                  <Typography
+                    variant="caption"
                     sx={{
                       color: 'text.secondary',
                       letterSpacing: '0.05em',

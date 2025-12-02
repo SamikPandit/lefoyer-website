@@ -6,11 +6,11 @@ const Header = () => {
   return (
     <AppBar position="sticky" sx={{ backgroundColor: 'background.default', color: 'text.primary' }} elevation={0}>
       <Toolbar sx={{ justifyContent: 'space-between', py: 1 }}>
-        <Typography 
-          variant="h5" 
+        <Typography
+          variant="h5"
           component={Link}
           to="/"
-          sx={{ 
+          sx={{
             fontWeight: 700,
             textDecoration: 'none',
             color: 'inherit'
@@ -24,9 +24,6 @@ const Header = () => {
           </MuiLink>
           <MuiLink component={Link} to="/about" color="inherit" underline="hover" sx={{ fontWeight: 500 }}>
             About
-          </MuiLink>
-          <MuiLink component={Link} to="/contact" color="inherit" underline="hover" sx={{ fontWeight: 500 }}>
-            Contact
           </MuiLink>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

@@ -10,6 +10,7 @@ import About from './pages/About';
 import ShippingPolicy from './pages/ShippingPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import FAQ from './pages/FAQ';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Layout from './components/layout/Layout';
@@ -38,6 +39,7 @@ function App() {
                 <Route path="/shipping-returns" element={<ShippingPolicy />} />
                 <Route path="/terms" element={<TermsAndConditions />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/faq" element={<FAQ />} />
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="*" element={<div>Page not found</div>} />

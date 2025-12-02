@@ -1,11 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Container, Grid, Typography, Link, TextField, Button, Stack, IconButton } from '@mui/material';
 import InstagramIcon from '@mui/icons-material/Instagram';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import PinterestIcon from '@mui/icons-material/Pinterest';
 
 const Footer = () => {
+  const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+
+  const handleSubscribe = (e) => {
+    e.preventDefault();
+    if (email) {
+      setSubscribed(true);
+      setEmail('');
+    }
+  };
   return (
     <Box
       component="footer"
@@ -35,16 +42,26 @@ const Footer = () => {
               Curating the finest natural beauty products for your daily ritual.
               We believe in the power of nature to rejuvenate and restore.
             </Typography>
-            <Stack direction="row" spacing={1}>
-              <IconButton size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <IconButton
+                component="a"
+                href="https://instagram.com/lefoyerglobal"
+                target="_blank"
+                size="small"
+                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+              >
                 <InstagramIcon />
               </IconButton>
-              <IconButton size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
-                <FacebookIcon />
-              </IconButton>
-              <IconButton size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
-                <PinterestIcon />
-              </IconButton>
+              <Link
+                href="https://instagram.com/lefoyerglobal"
+                target="_blank"
+                color="text.secondary"
+                underline="hover"
+                variant="body2"
+                sx={{ '&:hover': { color: 'primary.main' } }}
+              >
+                @lefoyerglobal
+              </Link>
             </Stack>
           </Grid>
 
@@ -54,10 +71,10 @@ const Footer = () => {
               SUPPORT
             </Typography>
             <Stack spacing={2}>
-              {['Contact Us', 'Shipping & Returns', 'FAQ', 'Privacy Policy', 'Terms of Service'].map((item) => (
+              {['Shipping & Returns', 'Privacy Policy', 'Terms of Service'].map((item) => (
                 <Link
                   key={item}
-                  href={item === 'Privacy Policy' ? '#/privacy-policy' : item === 'Terms of Service' ? '#/terms' : item === 'Shipping & Returns' ? '#/shipping-returns' : '#'}
+                  href={item === 'Privacy Policy' ? '#/privacy-policy' : item === 'Terms of Service' ? '#/terms' : item === 'Shipping & Returns' ? '#/shipping-returns' : item === 'FAQ' ? '#/faq' : '#'}
                   color="text.secondary"
                   underline="none"
                   sx={{
@@ -80,35 +97,49 @@ const Footer = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Subscribe to receive updates, access to exclusive deals, and more.
             </Typography>
-            <Box component="form" noValidate autoComplete="off">
-              <Stack direction="row" spacing={1}>
-                <TextField
-                  placeholder="Your email address"
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 0,
-                      bgcolor: 'white',
-                      '& fieldset': { borderColor: '#E8E8E8' },
-                      '&:hover fieldset': { borderColor: '#C9A96E' },
-                    }
-                  }}
-                />
-                <Button
-                  variant="contained"
-                  disableElevation
-                  sx={{
-                    minWidth: '100px',
-                    bgcolor: 'primary.main',
-                    '&:hover': { bgcolor: 'primary.dark' }
-                  }}
-                >
-                  JOIN
-                </Button>
-              </Stack>
-            </Box>
+            {subscribed ? (
+              <Box sx={{ p: 2, bgcolor: 'rgba(201, 169, 110, 0.1)', borderRadius: 1 }}>
+                <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 600, mb: 1 }}>
+                  Thank you for subscribing!
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  You'll receive our latest updates and exclusive offers soon.
+                </Typography>
+              </Box>
+            ) : (
+              <Box component="form" noValidate autoComplete="off" onSubmit={handleSubscribe}>
+                <Stack direction="row" spacing={1}>
+                  <TextField
+                    placeholder="Your email address"
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 0,
+                        bgcolor: 'white',
+                        '& fieldset': { borderColor: '#E8E8E8' },
+                        '&:hover fieldset': { borderColor: '#C9A96E' },
+                      }
+                    }}
+                  />
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disableElevation
+                    sx={{
+                      minWidth: '100px',
+                      bgcolor: 'primary.main',
+                      '&:hover': { bgcolor: 'primary.dark' }
+                    }}
+                  >
+                    JOIN
+                  </Button>
+                </Stack>
+              </Box>
+            )}
           </Grid>
         </Grid>
 
