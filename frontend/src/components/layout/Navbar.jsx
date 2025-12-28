@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppBar, Toolbar, Typography, Box, IconButton, Badge, Drawer, List, ListItem, ListItemText, useScrollTrigger, Slide, Container } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
@@ -13,6 +14,7 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { cart } = useCart();
+  const { isAuthenticated } = useAuth();
   const isHome = location.pathname === '/';
 
   // Handle scroll effect
@@ -38,12 +40,13 @@ const Navbar = () => {
       <AppBar
         position="fixed"
         sx={{
-          backgroundColor: isScrolled || !isHome ? 'rgba(253, 251, 249, 0.85)' : 'transparent',
-          backdropFilter: isScrolled || !isHome ? 'blur(12px)' : 'none',
-          borderBottom: isScrolled || !isHome ? '1px solid rgba(201, 169, 110, 0.1)' : 'none',
+          backgroundColor: isScrolled ? 'rgba(26, 26, 26, 0.95)' : 'transparent', // Dark background on scroll
+          backdropFilter: isScrolled ? 'blur(12px)' : 'none',
+          borderBottom: isScrolled ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
           transition: 'all 0.3s ease',
           boxShadow: 'none',
           py: 1,
+          color: isScrolled || !isHome ? 'white' : 'white', // Always white text for dark theme
         }}
       >
         <Container maxWidth="xl">
@@ -72,7 +75,7 @@ const Navbar = () => {
                   variant="button"
                   sx={{
                     textDecoration: 'none',
-                    color: 'text.primary',
+                    color: 'inherit', // Inherit from parent (which is set to white)
                     fontSize: '0.875rem',
                     fontWeight: 500,
                     letterSpacing: '0.1em',
@@ -106,7 +109,7 @@ const Navbar = () => {
                 flex: 1,
                 textAlign: 'center',
                 textDecoration: 'none',
-                color: 'text.primary',
+                color: 'inherit',
                 fontFamily: "'Cormorant Garamond', serif",
                 fontWeight: 600,
                 letterSpacing: '0.05em',
@@ -119,13 +122,13 @@ const Navbar = () => {
 
             {/* Right Icons */}
             <Box sx={{ display: 'flex', gap: { xs: 0.5, md: 2 }, flex: 1, justifyContent: 'flex-end' }}>
-              <IconButton sx={{ color: 'text.primary' }}>
+              <IconButton sx={{ color: 'inherit' }}>
                 <SearchIcon />
               </IconButton>
-              <IconButton component={Link} to="/login" sx={{ color: 'text.primary', display: { xs: 'none', sm: 'flex' } }}>
+              <IconButton component={Link} to={isAuthenticated ? "/profile" : "/login"} sx={{ color: 'inherit', display: { xs: 'none', sm: 'flex' } }}>
                 <PersonOutlineIcon />
               </IconButton>
-              <IconButton component={Link} to="/cart" sx={{ color: 'text.primary' }}>
+              <IconButton component={Link} to="/cart" sx={{ color: 'inherit' }}>
                 <Badge badgeContent={cart?.count || 0} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
                   <ShoppingBagOutlinedIcon />
                 </Badge>

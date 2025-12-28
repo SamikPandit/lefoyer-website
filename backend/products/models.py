@@ -39,6 +39,13 @@ class Product(models.Model):
     image_2 = models.ImageField(upload_to='products/', blank=True, null=True)
     image_3 = models.ImageField(upload_to='products/', blank=True, null=True)
     image_4 = models.ImageField(upload_to='products/', blank=True, null=True)
+    image_5 = models.ImageField(upload_to='products/', blank=True, null=True)
+    image_6 = models.ImageField(upload_to='products/', blank=True, null=True)
+    image_7 = models.ImageField(upload_to='products/', blank=True, null=True)
+    image_8 = models.ImageField(upload_to='products/', blank=True, null=True)
+    image_9 = models.ImageField(upload_to='products/', blank=True, null=True)
+    image_10 = models.ImageField(upload_to='products/', blank=True, null=True)
+    show_at_website = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

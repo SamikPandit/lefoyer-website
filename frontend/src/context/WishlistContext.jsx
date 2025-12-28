@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   getWishlist,
-  addToWishlist as mockAddToWishlist,
-  removeFromWishlist as mockRemoveFromWishlist
-} from '../services/mockApi';
+  addToWishlist as apiAddToWishlist,
+  removeFromWishlist as apiRemoveFromWishlist
+} from '../services/api';
 
 const WishlistContext = createContext();
 
@@ -32,8 +32,9 @@ export const WishlistProvider = ({ children }) => {
 
   const addToWishlist = async (productId) => {
     try {
-      const response = await mockAddToWishlist(productId);
-      setWishlist(response.data);
+      await apiAddToWishlist(productId);
+      // Refresh wishlist after adding
+      await fetchWishlist();
       return true;
     } catch (err) {
       console.error('Failed to add to wishlist:', err);
@@ -43,8 +44,9 @@ export const WishlistProvider = ({ children }) => {
 
   const removeFromWishlist = async (productId) => {
     try {
-      const response = await mockRemoveFromWishlist(productId);
-      setWishlist(response.data);
+      await apiRemoveFromWishlist(productId);
+      // Refresh wishlist after removing
+      await fetchWishlist();
       return true;
     } catch (err) {
       console.error('Failed to remove from wishlist:', err);

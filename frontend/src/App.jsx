@@ -13,10 +13,12 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import FAQ from './pages/FAQ';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import Profile from './pages/Profile';
 import Layout from './components/layout/Layout';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { CartProvider } from './context/CartContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/common/ScrollToTop';
 
 function App() {
@@ -33,15 +35,32 @@ function App() {
                 <Route path="/product/:slug" element={<ProductDetail />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<SignUp />} />
-                <Route path="/wishlist" element={<Wishlist />} />
-                <Route path="/order-confirmation" element={<OrderConfirmation />} />
+                <Route path="/wishlist" element={
+                  <ProtectedRoute>
+                    <Wishlist />
+                  </ProtectedRoute>
+                } />
+                <Route path="/order-confirmation" element={
+                  <ProtectedRoute>
+                    <OrderConfirmation />
+                  </ProtectedRoute>
+                } />
                 <Route path="/about" element={<About />} />
                 <Route path="/shipping-returns" element={<ShippingPolicy />} />
                 <Route path="/terms" element={<TermsAndConditions />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/cart" element={<Cart />} />
-                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/checkout" element={
+                  <ProtectedRoute>
+                    <Checkout />
+                  </ProtectedRoute>
+                } />
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } />
                 <Route path="*" element={<div>Page not found</div>} />
               </Routes>
             </Layout>

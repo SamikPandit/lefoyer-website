@@ -5,7 +5,7 @@ import ProductCard from '../components/product/ProductCard';
 import ProductFilter from '../components/product/ProductFilter';
 import ProductViewToggle from '../components/product/ProductViewToggle';
 import ProductPagination from '../components/product/ProductPagination';
-import { getProducts, getCategories, getSubCategories } from '../services/mockApi';
+import { getProducts, getCategories, getSubCategories } from '../services/api';
 import { useLocation } from 'react-router-dom';
 
 const ProductListing = () => {
@@ -49,10 +49,16 @@ const ProductListing = () => {
   const fetchProducts = useCallback(async () => {
     try {
       const response = await getProducts({ ...filters, page });
-      setProducts(response.data.results);
-      setTotalPages(Math.ceil(response.data.count / 10));
+      if (response.data && response.data.results) {
+        setProducts(response.data.results);
+        setTotalPages(Math.ceil(response.data.count / 10));
+      } else {
+        setProducts([]);
+        setTotalPages(1);
+      }
     } catch (error) {
       console.error('Failed to fetch products:', error);
+      setProducts([]);
     }
   }, [filters, page]);
 
@@ -157,9 +163,9 @@ const ProductListing = () => {
           {/* Desktop Filter Sidebar - Fixed Width */}
           {!isMobile && (
             <Box sx={{ width: '260px', flexShrink: 0 }}>
-              <Paper 
-                elevation={0} 
-                sx={{ 
+              <Paper
+                elevation={0}
+                sx={{
                   p: 2,
                   position: 'sticky',
                   top: 80,
@@ -212,9 +218,9 @@ const ProductListing = () => {
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.813rem' }}>
                     Active Filters
                   </Typography>
-                  <Button 
-                    onClick={handleClearAllFilters} 
-                    size="small" 
+                  <Button
+                    onClick={handleClearAllFilters}
+                    size="small"
                     sx={{ textTransform: 'none', fontSize: '0.75rem', minWidth: 'auto', p: 0.5 }}
                   >
                     Clear All
@@ -235,12 +241,12 @@ const ProductListing = () => {
             )}
 
             {/* Toolbar */}
-            <Paper 
+            <Paper
               elevation={0}
-              sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 p: 1.5,
                 mb: 2,
                 border: '1px solid',
@@ -259,7 +265,7 @@ const ProductListing = () => {
                 <Box
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: view === 'grid' 
+                    gridTemplateColumns: view === 'grid'
                       ? { xs: 'repeat(2, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }
                       : 'repeat(1, 1fr)',
                     gap: 2,
@@ -280,10 +286,10 @@ const ProductListing = () => {
                 )}
               </>
             ) : (
-              <Paper 
+              <Paper
                 elevation={0}
-                sx={{ 
-                  textAlign: 'center', 
+                sx={{
+                  textAlign: 'center',
                   py: 8,
                   border: '1px solid',
                   borderColor: 'grey.200',

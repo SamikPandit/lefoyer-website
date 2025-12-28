@@ -5,25 +5,31 @@ from .models import Product, Category, SubCategory
 from .serializers import ProductSerializer, CategorySerializer, SubCategorySerializer
 from .filters import ProductFilter
 
+from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
+
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     filterset_class = ProductFilter
     lookup_field = 'slug'
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
-    @action(detail=False, methods=['get'])
+    def get_queryset(self):
+        return Product.objects.filter(show_at_website=True)
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def featured(self, request):
         featured_products = Product.objects.filter(is_featured=True)
         serializer = self.get_serializer(featured_products, many=True)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def bestsellers(self, request):
         bestseller_products = Product.objects.filter(is_bestseller=True)
         serializer = self.get_serializer(bestseller_products, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
     def related(self, request, slug=None):
         try:
             product = self.get_object()
@@ -36,7 +42,9 @@ class ProductViewSet(viewsets.ModelViewSet):
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
 class SubCategoryViewSet(viewsets.ModelViewSet):
     queryset = SubCategory.objects.all()
     serializer_class = SubCategorySerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]

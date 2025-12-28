@@ -44,7 +44,8 @@ class PasswordResetSerializer(serializers.Serializer):
 
         # In a real application, you would send an email with a link containing uid and token
         # For now, we'll just print it to the console.
-        reset_link = f"http://localhost:3000/reset-password/{uid}/{token}/"
+        from django.conf import settings
+        reset_link = f"{settings.SITE_URL}/reset-password/{uid}/{token}/"
         print(f"Password reset link for {user.email}: {reset_link}")
 
         # Example of sending email (requires email configuration in settings.py)

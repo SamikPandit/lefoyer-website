@@ -28,7 +28,7 @@ import {
   Verified,
   Loop
 } from '@mui/icons-material';
-import { getProductBySlug } from '../services/mockApi';
+import { getProductBySlug } from '../services/api';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import RelatedProducts from '../components/product/RelatedProducts';
@@ -86,9 +86,13 @@ const ProductDetail = () => {
     setOpenSnackbar(true);
   };
 
-  const handleAddToCart = () => {
-    addToCart(product, quantity);
-    setSnackbarMessage('Added to cart');
+  const handleAddToCart = async () => {
+    const success = await addToCart(product, quantity);
+    if (success) {
+      setSnackbarMessage('Added to cart');
+    } else {
+      setSnackbarMessage('Failed to add to cart');
+    }
     setOpenSnackbar(true);
   };
 
@@ -100,7 +104,18 @@ const ProductDetail = () => {
     );
   }
 
-  const images = [product.image_main, product.image_2, product.image_3, product.image_4].filter(Boolean);
+  const images = [
+    product.image_main,
+    product.image_2,
+    product.image_3,
+    product.image_4,
+    product.image_5,
+    product.image_6,
+    product.image_7,
+    product.image_8,
+    product.image_9,
+    product.image_10
+  ].filter(Boolean);
 
   return (
     <Box sx={{ backgroundColor: '#FAFAFA', minHeight: '100vh', py: 3 }}>

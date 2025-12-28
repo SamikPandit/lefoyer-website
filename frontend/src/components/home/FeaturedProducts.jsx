@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Grid, Box, Container, Typography, Button, CircularProgress } from '@mui/material';
 import { Link } from 'react-router-dom';
 import ProductCard from '../product/ProductCard';
-import { getProducts } from '../../services/mockApi';
+import { getProducts } from '../../services/api';
 
 const FeaturedProducts = () => {
   const [products, setProducts] = useState([]);
@@ -36,87 +36,83 @@ const FeaturedProducts = () => {
   }
 
   return (
-    <Box
-      sx={{
-        py: { xs: 8, md: 12 },
-        backgroundColor: 'background.default',
-      }}
-    >
-      <Container maxWidth="lg">
-        {/* Section Header */}
-        <Box sx={{ textAlign: 'center', mb: 8 }}>
-          <Typography
-            variant="caption"
-            component="p"
-            sx={{
-              color: 'primary.main',
-              mb: 2,
-              fontWeight: 600,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Curated Favorites
-          </Typography>
+    <Box sx={{ py: { xs: 8, md: 12 }, backgroundColor: '#FDFBF9' }}>
+      <Container maxWidth="xl">
+        <Grid container spacing={6} alignItems="center">
+          {/* Editorial Text - Left */}
+          <Grid item xs={12} md={4}>
+            <Box sx={{ pr: { md: 4 } }}>
+              <Typography
+                variant="h2"
+                sx={{
+                  fontFamily: "'Oswald', sans-serif",
+                  fontWeight: 700,
+                  fontSize: { xs: '2.5rem', md: '4rem' },
+                  lineHeight: 1,
+                  mb: 3,
+                  textTransform: 'uppercase',
+                  color: '#1a1a1a'
+                }}
+              >
+                Curated<br />
+                <Box component="span" sx={{ color: '#C9A96E' }}>Essentials</Box>
+              </Typography>
 
-          <Typography
-            variant="h2"
-            component="h2"
-            sx={{
-              color: 'text.primary',
-              mb: 3,
-            }}
-          >
-            Featured Products
-          </Typography>
+              <Typography
+                variant="body1"
+                sx={{
+                  mb: 4,
+                  fontSize: '1.1rem',
+                  lineHeight: 1.8,
+                  color: 'text.secondary',
+                  maxWidth: '400px'
+                }}
+              >
+                Discover our most beloved formulations, hand-picked for their transformative results and uncompromising quality.
+              </Typography>
 
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{
-              maxWidth: '600px',
-              mx: 'auto',
-              fontSize: '1.1rem',
-              lineHeight: 1.6,
-            }}
-          >
-            Discover our most beloved products, hand-picked for their exceptional quality and transformative results.
-          </Typography>
-        </Box>
+              <Button
+                component={Link}
+                to="/products"
+                variant="outlined"
+                size="large"
+                sx={{
+                  borderColor: '#1a1a1a',
+                  color: '#1a1a1a',
+                  px: 5,
+                  py: 1.5,
+                  borderRadius: 0,
+                  borderWidth: '1px',
+                  '&:hover': {
+                    backgroundColor: '#1a1a1a',
+                    color: '#fff',
+                    borderWidth: '1px'
+                  }
+                }}
+              >
+                View All
+              </Button>
+            </Box>
+          </Grid>
 
-        {/* Products Grid */}
-        <Grid container spacing={4} justifyContent="center">
-          {products.slice(0, 2).map((product) => (
-            <Grid item xs={12} sm={6} md={4} key={product.id} sx={{ display: 'flex', justifyContent: 'center' }}>
-              <Box sx={{ width: '100%', maxWidth: '350px' }}>
-                <ProductCard product={product} />
-              </Box>
-            </Grid>
-          ))}
+          {/* Products - Right (Horizontal Scroll on Mobile) */}
+          <Grid item xs={12} md={8}>
+            <Box sx={{
+              display: 'flex',
+              gap: 3,
+              overflowX: 'auto',
+              pb: 2,
+              '::-webkit-scrollbar': { display: 'none' },
+              scrollbarWidth: 'none'
+            }}>
+              {products.slice(0, 3).map((product) => (
+                <Box key={product.id} sx={{ minWidth: '300px', flex: 1 }}>
+                  <ProductCard product={product} />
+                </Box>
+              ))}
+            </Box>
+          </Grid>
         </Grid>
-
-        {/* View All Button */}
-        <Box sx={{ textAlign: 'center', mt: 8 }}>
-          <Button
-            variant="outlined"
-            component={Link}
-            to="/products"
-            size="large"
-            sx={{
-              px: 6,
-              py: 1.5,
-              fontSize: '0.9rem',
-              borderColor: 'primary.main',
-              color: 'primary.main',
-              '&:hover': {
-                backgroundColor: 'rgba(201, 169, 110, 0.05)',
-                borderColor: 'primary.dark',
-              },
-            }}
-          >
-            View All Products
-          </Button>
-        </Box>
       </Container>
     </Box>
   );

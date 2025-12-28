@@ -73,3 +73,86 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         serializer = OrderSerializer(order)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+from rest_framework.views import APIView
+from django.shortcuts import redirect
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from .payment import PhonePeGateway
+import base64
+import json
+
+class InitiatePaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk=None):
+        try:
+            order = Order.objects.get(pk=pk, user=request.user)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.paid:
+            return Response({'error': 'Order already paid'}, status=status.HTTP_400_BAD_REQUEST)
+
+        gateway = PhonePeGateway()
+        response = gateway.initiate_payment(
+            order_id=order.id,
+            amount=float(order.total),
+            user_id=request.user.id
+        )
+
+        if response['success']:
+            order.provider_order_id = response['merchant_transaction_id']
+            order.save()
+            return Response({'redirect_url': response['redirect_url']})
+        else:
+            return Response({'error': 'Payment initiation failed', 'details': response.get('error')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class PaymentCallbackView(APIView):
+    permission_classes = []  # Allow public access for callback
+
+    def post(self, request):
+        try:
+            if 'response' in request.data:
+                # S2S Callback
+                encoded_response = request.data.get('response')
+                x_verify = request.headers.get('X-VERIFY')
+                
+                gateway = PhonePeGateway()
+                if not gateway.verify_callback(encoded_response, x_verify):
+                     return Response({'error': 'Invalid checksum'}, status=status.HTTP_400_BAD_REQUEST)
+
+                decoded_response = json.loads(base64.b64decode(encoded_response).decode('utf-8'))
+                
+                if decoded_response.get('code') == 'PAYMENT_SUCCESS':
+                    merchant_transaction_id = decoded_response['data']['merchantTransactionId']
+                    transaction_id = decoded_response['data']['transactionId']
+                    
+                    try:
+                        order = Order.objects.get(provider_order_id=merchant_transaction_id)
+                        order.paid = True
+                        order.payment_status = 'COMPLETED'
+                        order.payment_id = transaction_id
+                        order.save()
+                    except Order.DoesNotExist:
+                        pass # Log error
+                        
+                elif decoded_response.get('code') == 'PAYMENT_ERROR':
+                     merchant_transaction_id = decoded_response['data']['merchantTransactionId']
+                     try:
+                        order = Order.objects.get(provider_order_id=merchant_transaction_id)
+                        order.payment_status = 'FAILED'
+                        order.save()
+                     except Order.DoesNotExist:
+                        pass
+
+                return Response({'status': 'success'})
+            else:
+                # Redirect return (if configured to POST to this URL)
+                # Usually PhonePe redirects to a URL with POST data
+                # We should handle it or have a separate view for UI redirect
+                return Response({'status': 'ok'})
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

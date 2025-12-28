@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-yoursecretkey'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'www.lefoyerglobal.com', 'lefoyerglobal.com']
 
 
 # Application definition
@@ -159,7 +159,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
+    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
 }
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -169,6 +171,34 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "https://www.lefoyerglobal.com",
+    "https://lefoyerglobal.com",
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://www.lefoyerglobal.com",
+    "https://lefoyerglobal.com",
+]
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# PhonePe Configuration
+PHONEPE_ENV = os.getenv('PHONEPE_ENV', 'SANDBOX')
+
+if PHONEPE_ENV == 'PRODUCTION':
+    PHONEPE_MERCHANT_ID = os.getenv('PHONEPE_PROD_MERCHANT_ID')
+    PHONEPE_SALT_KEY = os.getenv('PHONEPE_PROD_SALT_KEY')
+    PHONEPE_SALT_INDEX = int(os.getenv('PHONEPE_PROD_SALT_INDEX', 1))
+else:
+    PHONEPE_MERCHANT_ID = os.getenv('PHONEPE_TEST_MERCHANT_ID')
+    PHONEPE_SALT_KEY = os.getenv('PHONEPE_TEST_SALT_KEY')
+    PHONEPE_SALT_INDEX = int(os.getenv('PHONEPE_TEST_SALT_INDEX', 1))
+
+PHONEPE_ENV = os.getenv("PHONEPE_ENV", "UAT")
+PHONEPE_CALLBACK_URL = os.getenv("PHONEPE_CALLBACK_URL", "http://localhost:8000/api/orders/payment/callback/")
+
+SITE_URL = os.getenv("SITE_URL", "http://localhost:5173")
+API_URL = os.getenv("API_URL", "http://localhost:8000")

@@ -11,7 +11,7 @@ class CartViewSet(viewsets.ViewSet):
 
     def list(self, request):
         cart, created = Cart.objects.get_or_create(user=request.user)
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'])
@@ -32,7 +32,7 @@ class CartViewSet(viewsets.ViewSet):
             cart_item.quantity = quantity
         cart_item.save()
 
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=True, methods=['patch'])
@@ -50,7 +50,7 @@ class CartViewSet(viewsets.ViewSet):
             cart_item.delete()
 
         cart = Cart.objects.get(user=request.user)
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=True, methods=['delete'])
@@ -63,12 +63,12 @@ class CartViewSet(viewsets.ViewSet):
         cart_item.delete()
 
         cart = Cart.objects.get(user=request.user)
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=False, methods=['delete'])
     def clear(self, request):
         cart, created = Cart.objects.get_or_create(user=request.user)
         cart.items.all().delete()
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)

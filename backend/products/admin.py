@@ -13,7 +13,7 @@ class SubCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'category', 'sub_category', 'price', 'stock_quantity', 'is_featured', 'is_bestseller')
-    list_filter = ('category', 'sub_category', 'is_featured', 'is_bestseller')
-    list_editable = ('price', 'stock_quantity', 'is_featured', 'is_bestseller')
+    list_display = ('name', 'slug', 'category', 'sub_category', 'price', 'stock_quantity', 'is_featured', 'show_at_website')
+    list_filter = ('category', 'sub_category', 'is_featured', 'show_at_website')
+    list_editable = ('price', 'stock_quantity', 'is_featured', 'show_at_website')
     prepopulated_fields = {'slug': ('name',)}

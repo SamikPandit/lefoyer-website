@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { loginUser as mockLogin, getCurrentUser } from '../services/mockApi';
+import { loginUser } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
     // Check for existing token
     const savedToken = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('user');
-    
+
     if (savedToken && savedUser) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
@@ -22,14 +22,22 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      const response = await mockLogin(credentials);
-      const { access, user: userData } = response.data;
-      
+      const response = await loginUser(credentials);
+      const { access, refresh, user: userData } = response.data;
+
+      // If user data is not returned in login response, you might need to fetch it separately
+      // For now assuming backend returns it or we decode it from token if needed
+      // But standard JWT auth usually returns access/refresh. 
+      // Let's assume the backend serializer returns user data too or we use the username from credentials for now if not provided.
+
+      const userToSave = userData || { username: credentials.username };
+
       setToken(access);
-      setUser(userData);
+      setUser(userToSave);
       localStorage.setItem('authToken', access);
-      localStorage.setItem('user', JSON.stringify(userData));
-      
+      localStorage.setItem('refreshToken', refresh);
+      localStorage.setItem('user', JSON.stringify(userToSave));
+
       return true;
     } catch (error) {
       console.error('Login failed:', error);

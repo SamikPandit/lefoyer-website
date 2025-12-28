@@ -20,6 +20,13 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     paid = models.BooleanField(default=False)
+    payment_id = models.CharField(max_length=100, blank=True, null=True)
+    provider_order_id = models.CharField(max_length=100, blank=True, null=True)
+    payment_status = models.CharField(max_length=20, default='PENDING', choices=[
+        ('PENDING', 'Pending'),
+        ('COMPLETED', 'Completed'),
+        ('FAILED', 'Failed'),
+    ])
 
     class Meta:
         ordering = ('-created_at',)

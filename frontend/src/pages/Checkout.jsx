@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Typography, Box, Grid, TextField, Button, Paper, Radio, RadioGroup, FormControlLabel, Divider, Stepper, Step, StepLabel } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 const Checkout = () => {
     const { cart, clearCart } = useCart();
+    const { token } = useAuth();
     const navigate = useNavigate();
     const [activeStep, setActiveStep] = useState(0);
     const [formData, setFormData] = useState({
@@ -16,8 +19,15 @@ const Checkout = () => {
         city: '',
         state: '',
         zip: '',
-        paymentMethod: 'card'
+        paymentMethod: 'upi'
     });
+
+    useEffect(() => {
+        if (!token) {
+            // Redirect to login if not authenticated
+            navigate('/login');
+        }
+    }, [token, navigate]);
 
     if (cart.items.length === 0) {
         navigate('/cart');
@@ -37,12 +47,56 @@ const Checkout = () => {
         setActiveStep((prev) => prev - 1);
     };
 
-    const handlePlaceOrder = () => {
-        // Simulate order placement
-        setTimeout(() => {
-            clearCart();
-            navigate('/order-confirmation');
-        }, 1500);
+    const handlePlaceOrder = async () => {
+        try {
+            if (!token) {
+                alert('Please log in to place an order.');
+                navigate('/login');
+                return;
+            }
+
+            // 1. Create Order
+            const orderResponse = await api.post('orders/', {
+                shipping_info: {
+                    first_name: formData.firstName,
+                    last_name: formData.lastName,
+                    email: formData.email,
+                    phone: formData.phone,
+                    address: formData.address,
+                    city: formData.city,
+                    state: formData.state,
+                    pincode: formData.zip
+                },
+                payment_method: formData.paymentMethod
+            });
+
+            const orderData = orderResponse.data;
+            const orderId = orderData.id;
+
+            // 2. Initiate Payment (if UPI/Card)
+            if (formData.paymentMethod === 'upi' || formData.paymentMethod === 'card') {
+                const paymentResponse = await api.post(`orders/${orderId}/initiate-payment/`);
+
+                const paymentData = paymentResponse.data;
+
+                // Refresh cart state (backend cart is already empty, this syncs frontend)
+                await clearCart();
+
+                if (paymentData.redirect_url) {
+                    window.location.href = paymentData.redirect_url;
+                } else {
+                    alert('No redirect URL received');
+                }
+            } else {
+                // COD Flow
+                clearCart();
+                navigate('/order-confirmation');
+            }
+
+        } catch (error) {
+            console.error('Error placing order:', error);
+            alert('An error occurred while placing the order.');
+        }
     };
 
     const steps = ['Shipping Address', 'Payment Details', 'Review Order'];
@@ -66,11 +120,19 @@ const Checkout = () => {
                     <Grid item xs={12} md={8}>
                         <Paper elevation={0} sx={{ p: 4, borderRadius: 2, border: '1px solid #E0E0E0' }}>
                             {activeStep === 0 && (
-                                <Box>
+                                <Box component="form" noValidate>
                                     <Typography variant="h6" sx={{ mb: 3 }}>Contact Information</Typography>
                                     <Grid container spacing={2}>
                                         <Grid item xs={12} sm={6}>
-                                            <TextField fullWidth label="First Name" name="firstName" value={formData.firstName} onChange={handleInputChange} required />
+                                            <TextField
+                                                fullWidth
+                                                label="First Name"
+                                                name="firstName"
+                                                value={formData.firstName}
+                                                onChange={handleInputChange}
+                                                required
+                                                error={!formData.firstName && activeStep === 0} // Simple error indication
+                                            />
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
                                             <TextField fullWidth label="Last Name" name="lastName" value={formData.lastName} onChange={handleInputChange} required />
@@ -95,7 +157,43 @@ const Checkout = () => {
                                         </Grid>
                                     </Grid>
                                     <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
-                                        <Button variant="contained" onClick={handleNext} sx={{ backgroundColor: '#C9A96E', '&:hover': { backgroundColor: '#B08D55' } }}>
+                                        <Button
+                                            variant="contained"
+                                            onClick={() => {
+                                                // Enhanced Validation
+                                                const requiredFields = ['firstName', 'lastName', 'email', 'phone', 'address', 'city', 'state', 'zip'];
+                                                const emptyFields = requiredFields.filter(field => !formData[field].trim());
+
+                                                if (emptyFields.length > 0) {
+                                                    alert('Please fill in all required fields.');
+                                                    return;
+                                                }
+
+                                                // Email Validation
+                                                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                                                if (!emailRegex.test(formData.email)) {
+                                                    alert('Please enter a valid email address.');
+                                                    return;
+                                                }
+
+                                                // Phone Validation (10 digits)
+                                                const phoneRegex = /^\d{10}$/;
+                                                if (!phoneRegex.test(formData.phone.replace(/\D/g, ''))) {
+                                                    alert('Please enter a valid 10-digit phone number.');
+                                                    return;
+                                                }
+
+                                                // ZIP Code Validation (6 digits)
+                                                const zipRegex = /^\d{6}$/;
+                                                if (!zipRegex.test(formData.zip)) {
+                                                    alert('Please enter a valid 6-digit ZIP code.');
+                                                    return;
+                                                }
+
+                                                handleNext();
+                                            }}
+                                            sx={{ backgroundColor: '#C9A96E', '&:hover': { backgroundColor: '#B08D55' } }}
+                                        >
                                             Continue to Payment
                                         </Button>
                                     </Box>
@@ -106,26 +204,12 @@ const Checkout = () => {
                                 <Box>
                                     <Typography variant="h6" sx={{ mb: 3 }}>Payment Method</Typography>
                                     <RadioGroup name="paymentMethod" value={formData.paymentMethod} onChange={handleInputChange}>
-                                        <FormControlLabel value="card" control={<Radio />} label="Credit / Debit Card" />
-                                        <FormControlLabel value="upi" control={<Radio />} label="UPI" />
-                                        <FormControlLabel value="cod" control={<Radio />} label="Cash on Delivery" />
+                                        <FormControlLabel value="upi" control={<Radio />} label="UPI (PhonePe)" />
                                     </RadioGroup>
 
-                                    {formData.paymentMethod === 'card' && (
-                                        <Box sx={{ mt: 3, p: 3, backgroundColor: '#F5F5F5', borderRadius: 1 }}>
-                                            <Grid container spacing={2}>
-                                                <Grid item xs={12}>
-                                                    <TextField fullWidth label="Card Number" placeholder="0000 0000 0000 0000" />
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <TextField fullWidth label="Expiry Date" placeholder="MM/YY" />
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <TextField fullWidth label="CVV" type="password" />
-                                                </Grid>
-                                            </Grid>
-                                        </Box>
-                                    )}
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                                        Secure payment via PhonePe. You will be redirected to complete the payment.
+                                    </Typography>
 
                                     <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
                                         <Button onClick={handleBack}>Back</Button>
@@ -163,10 +247,9 @@ const Checkout = () => {
                                             variant="contained"
                                             onClick={handlePlaceOrder}
                                             size="large"
-                                            disabled
                                             sx={{ backgroundColor: '#C9A96E', '&:hover': { backgroundColor: '#B08D55' }, px: 4 }}
                                         >
-                                            Place Order (Coming Soon)
+                                            Place Order
                                         </Button>
                                     </Box>
                                 </Box>

@@ -10,11 +10,11 @@ const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  const handleQuickAdd = (e) => {
-    e.preventDefault(); // Prevent navigation to product detail
+  const handleAddToCart = async (e) => {
+    e.preventDefault();
     e.stopPropagation();
-    addToCart(product, 1);
-    setOpenSnackbar(true);
+    const success = await addToCart(product, 1);
+    // Optional: Add toast/snackbar here if needed, or rely on global notification
   };
 
   // Fallback if product is undefined or missing properties
@@ -181,7 +181,7 @@ const ProductCard = ({ product }) => {
                   color: 'white',
                 }
               }}
-              onClick={handleQuickAdd}
+              onClick={handleAddToCart}
             >
               Quick Add
             </Button>
