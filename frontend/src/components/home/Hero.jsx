@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Button, Grid, Container } from '@mui/material';
+import { Box, Typography, Button, Container } from '@mui/material';
 import { Link } from 'react-router-dom';
 
 const Hero = () => {
@@ -9,119 +9,142 @@ const Hero = () => {
       backgroundColor: '#1a1a1a',
       color: 'white',
       overflow: 'hidden',
-      minHeight: '90vh',
+      height: '90vh', // Fixed height
+      width: '100vw', // Full viewport width
       display: 'flex',
-      alignItems: 'center'
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
-      <Container maxWidth="xl" sx={{ height: '100%' }}>
-        <Grid container spacing={0} sx={{ height: '100%', alignItems: 'center' }}>
 
-          {/* Left Product Image */}
-          <Grid item xs={12} md={4} sx={{
-            height: { xs: '40vh', md: '80vh' },
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            position: 'relative',
-            zIndex: 1
+      {/* Main Content Container - Flexbox Row */}
+      <Box sx={{
+        display: 'flex',
+        width: '100%',
+        height: '100%',
+        maxWidth: '1800px', // Max width constraint
+        mx: 'auto',
+        alignItems: 'center'
+      }}>
+
+        {/* Left Column - Image */}
+        <Box sx={{
+          width: '33.33%',
+          height: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'relative',
+          zIndex: 1,
+          overflow: 'hidden'
+        }}>
+          <Box
+            component="img"
+            src="/images/products/Spotless_6.png"
+            alt="Le Foyer Product"
+            sx={{
+              maxWidth: '90%', // Leave some breathing room
+              maxHeight: '80%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0px 20px 30px rgba(0,0,0,0.5))',
+              transform: 'rotate(-5deg)',
+              transition: 'transform 0.5s ease',
+              '&:hover': { transform: 'rotate(0deg) scale(1.05)' }
+            }}
+          />
+        </Box>
+
+        {/* Center Column - Text */}
+        <Box sx={{
+          width: '33.33%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          textAlign: 'center',
+          zIndex: 2,
+          px: 2
+        }}>
+          <Typography variant="h1" sx={{
+            fontFamily: "'Oswald', sans-serif",
+            fontWeight: 700,
+            fontSize: 'clamp(2rem, 5vw, 6rem)', // Fluid typography
+            lineHeight: 0.9,
+            letterSpacing: '0.02em',
+            mb: 2,
+            textTransform: 'uppercase',
+            color: '#FDFBF9',
+            whiteSpace: 'nowrap'
           }}>
-            <Box
-              component="img"
-              src="/images/products/Spotless_6.png"
-              alt="Le Foyer Product"
-              sx={{
-                maxHeight: '80%',
-                maxWidth: '100%',
-                objectFit: 'contain',
-                filter: 'drop-shadow(0px 20px 30px rgba(0,0,0,0.5))',
-                transform: 'rotate(-5deg)',
-                transition: 'transform 0.5s ease',
-                '&:hover': { transform: 'rotate(0deg) scale(1.05)' }
-              }}
-            />
-          </Grid>
+            Don't Chase<br />
+            <Box component="span" sx={{ color: '#C9A96E' }}>Perfection.</Box><br />
+            Define It.
+          </Typography>
 
-          {/* Center Text Content */}
-          <Grid item xs={12} md={4} sx={{
-            textAlign: 'center',
-            zIndex: 2,
-            py: { xs: 4, md: 0 }
+          <Typography variant="h6" sx={{
+            mb: 4,
+            fontWeight: 300,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            opacity: 0.9,
+            fontSize: 'clamp(0.8rem, 1.5vw, 1.5rem)'
           }}>
-            <Typography variant="h1" sx={{
-              fontFamily: "'Oswald', sans-serif",
-              fontWeight: 700,
-              fontSize: { xs: '3rem', md: '5rem' },
-              lineHeight: 0.9,
-              letterSpacing: '0.02em',
-              mb: 2,
-              textTransform: 'uppercase',
-              color: '#FDFBF9'
-            }}>
-              Don't Chase<br />
-              <Box component="span" sx={{ color: '#C9A96E' }}>Perfection.</Box><br />
-              Define It.
-            </Typography>
+            Navigate Towards Elegance
+          </Typography>
 
-            <Typography variant="h6" sx={{
-              mb: 4,
-              fontWeight: 300,
+          <Button
+            component={Link}
+            to="/products"
+            variant="contained"
+            size="large"
+            sx={{
+              backgroundColor: '#C9A96E',
+              color: '#fff',
+              px: 6,
+              py: 1.5,
+              fontSize: 'clamp(0.8rem, 1.2vw, 1.2rem)',
+              borderRadius: 0,
               letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              opacity: 0.9
-            }}>
-              Navigate Towards Elegance
-            </Typography>
+              whiteSpace: 'nowrap',
+              '&:hover': {
+                backgroundColor: '#B08D55',
+                transform: 'translateY(-2px)'
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Shop Collection
+          </Button>
+        </Box>
 
-            <Button
-              component={Link}
-              to="/products"
-              variant="contained"
-              size="large"
-              sx={{
-                backgroundColor: '#C9A96E',
-                color: '#fff',
-                px: 6,
-                py: 1.5,
-                fontSize: '1.1rem',
-                borderRadius: 0,
-                letterSpacing: '0.1em',
-                '&:hover': {
-                  backgroundColor: '#B08D55',
-                  transform: 'translateY(-2px)'
-                },
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Shop Collection
-            </Button>
-          </Grid>
+        {/* Right Column - Image */}
+        <Box sx={{
+          width: '33.33%',
+          height: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'relative',
+          zIndex: 1,
+          overflow: 'hidden'
+        }}>
+          <Box
+            component="img"
+            src="/images/products/WhiteWave_8.png"
+            alt="Le Foyer Collection"
+            sx={{
+              maxWidth: '90%',
+              maxHeight: '80%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0px 20px 30px rgba(0,0,0,0.5))',
+              transform: 'rotate(5deg)',
+              transition: 'transform 0.5s ease',
+              '&:hover': { transform: 'rotate(0deg) scale(1.05)' }
+            }}
+          />
+        </Box>
 
-          {/* Right Product Image */}
-          <Grid item xs={12} md={4} sx={{
-            height: { xs: '40vh', md: '80vh' },
-            display: { xs: 'none', md: 'flex' },
-            justifyContent: 'center',
-            alignItems: 'center',
-            position: 'relative',
-            zIndex: 1
-          }}>
-            <Box
-              component="img"
-              src="/images/products/WhiteWave_8.png"
-              alt="Le Foyer Collection"
-              sx={{
-                maxHeight: '80%',
-                maxWidth: '100%',
-                objectFit: 'contain',
-                filter: 'drop-shadow(0px 20px 30px rgba(0,0,0,0.5))',
-                transform: 'rotate(5deg)',
-                transition: 'transform 0.5s ease',
-                '&:hover': { transform: 'rotate(0deg) scale(1.05)' }
-              }}
-            />
-          </Grid>
-        </Grid>
-      </Container>
+      </Box>
 
       {/* Background Elements */}
       <Box sx={{

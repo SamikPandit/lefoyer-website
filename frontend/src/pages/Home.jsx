@@ -10,6 +10,7 @@ import NewsletterSignup from '../components/home/NewsletterSignup';
 import NewYearBanner from '../components/home/NewYearBanner';
 
 const Home = () => {
+  // Force rebuild
   return (
     <>
       <Hero />
