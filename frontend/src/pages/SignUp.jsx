@@ -5,7 +5,6 @@ import { registerUser } from '../services/api';
 
 const SignUp = () => {
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -40,7 +39,6 @@ const SignUp = () => {
     setSuccess('');
     try {
       await registerUser({
-        username: formData.username,
         email: formData.email,
         password: formData.password,
         phone_number: formData.phone_number,
@@ -48,7 +46,24 @@ const SignUp = () => {
       setSuccess('Registration successful! Please log in.');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      setError('Failed to register. Please try again.');
+      if (err.response && err.response.data) {
+        // Handle specific field errors
+        if (err.response.data.email) {
+          setError(err.response.data.email[0]);
+        } else if (err.response.data.detail) {
+          setError(err.response.data.detail);
+        } else {
+          // Fallback for other errors
+          const firstError = Object.values(err.response.data)[0];
+          if (Array.isArray(firstError)) {
+            setError(firstError[0]);
+          } else {
+            setError('Failed to register. Please try again.');
+          }
+        }
+      } else {
+        setError('Failed to register. Please try again.');
+      }
       console.error(err);
     } finally {
       setLoading(false);
@@ -72,18 +87,6 @@ const SignUp = () => {
           {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
           {success && <Alert severity="success" sx={{ width: '100%', mb: 2 }}>{success}</Alert>}
           <Grid container spacing={2}>
-            <Grid xs={12}>
-              <TextField
-                required
-                fullWidth
-                id="username"
-                label="Username"
-                name="username"
-                autoComplete="username"
-                value={formData.username}
-                onChange={handleChange}
-              />
-            </Grid>
             <Grid xs={12}>
               <TextField
                 required

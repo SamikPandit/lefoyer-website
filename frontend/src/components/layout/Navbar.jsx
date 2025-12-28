@@ -100,25 +100,42 @@ const Navbar = () => {
               ))}
             </Box>
 
-            {/* Logo - Center */}
-            <Typography
-              variant="h4"
-              component={Link}
-              to="/"
-              sx={{
-                flex: 1,
-                textAlign: 'center',
-                textDecoration: 'none',
-                color: 'inherit',
-                fontFamily: "'Cormorant Garamond', serif",
-                fontWeight: 600,
-                letterSpacing: '0.05em',
-                fontSize: { xs: '1.75rem', md: '2.5rem' },
-                whiteSpace: 'nowrap',
-              }}
-            >
-              LE FOYER
-            </Typography>
+            {/* Logo & Tagline - Center */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Typography
+                variant="h4"
+                component={Link}
+                to="/"
+                sx={{
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  fontFamily: "'Cormorant Garamond', serif",
+                  fontWeight: 600,
+                  letterSpacing: '0.05em',
+                  fontSize: { xs: '1.75rem', md: '2.5rem' },
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1,
+                }}
+              >
+                LE FOYER
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: 'inherit',
+                  fontFamily: "'Cormorant Garamond', serif",
+                  fontStyle: 'italic',
+                  fontSize: { xs: '0.7rem', md: '0.9rem' },
+                  letterSpacing: '0.05em',
+                  mt: 0.5,
+                  opacity: 0.9,
+                  display: { xs: 'none', sm: 'block' } // Hide on very small screens if needed, or keep
+                }}
+              >
+                Luxury Skin care for family
+              </Typography>
+            </Box>
 
             {/* Right Icons */}
             <Box sx={{ display: 'flex', gap: { xs: 0.5, md: 2 }, flex: 1, justifyContent: 'flex-end' }}>

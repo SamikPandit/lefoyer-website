@@ -303,6 +303,27 @@ const ProductDetail = () => {
                   </IconButton>
                 </Box>
 
+                {/* Amazon Link */}
+                {(product.name.includes('Whitewave') || product.name.includes('Spotless')) && (
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    size="large"
+                    href={product.name.includes('Whitewave') ? "https://amzn.in/d/9JVPdnF" : "https://amzn.in/d/0h6KdHF"}
+                    target="_blank"
+                    sx={{
+                      mb: 2,
+                      borderColor: '#C9A96E',
+                      color: '#C9A96E',
+                      '&:hover': { borderColor: '#B08D55', color: '#B08D55', backgroundColor: 'rgba(201, 169, 110, 0.05)' },
+                      textTransform: 'none',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    Buy on Amazon
+                  </Button>
+                )}
+
                 {/* Delivery Info */}
                 <Box sx={{ backgroundColor: '#F0F2F2', p: 2, borderRadius: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1.5 }}>

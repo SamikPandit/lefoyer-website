@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = User.objects.create_user(
-            username=validated_data['username'],
+            username=validated_data['email'], # Set username to email
             password=validated_data['password'],
             email=validated_data.get('email', ''),
             first_name=validated_data.get('first_name', ''),
@@ -22,9 +22,14 @@ class UserSerializer(serializers.ModelSerializer):
         )
         return user
 
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("User with this email already exists.")
+        return value
+
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'phone_number', 'password')
+        fields = ('id', 'email', 'first_name', 'last_name', 'phone_number', 'password')
 
 class PasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)

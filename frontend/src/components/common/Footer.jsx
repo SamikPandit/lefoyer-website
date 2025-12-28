@@ -143,7 +143,36 @@ const Footer = () => {
           </Grid>
         </Grid>
 
-        <Box sx={{ mt: 10, pt: 3, borderTop: '1px solid #E8E8E8', textAlign: 'center' }}>
+        {/* Made in India Section */}
+        <Box sx={{ mt: 8, mb: 4, textAlign: 'center' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+            <Box
+              component="img"
+              src="/images/products/State_Emblem_of_India.png"
+              alt="State Emblem of India"
+              sx={{
+                width: 150,
+                height: 'auto',
+                opacity: 0.7,
+                mb: 1
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                fontFamily: "'Cormorant Garamond', serif",
+                color: 'text.secondary',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                fontWeight: 600
+              }}
+            >
+              Exclusively made in India
+            </Typography>
+          </Box>
+        </Box>
+
+        <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #E8E8E8', textAlign: 'center' }}>
           <Typography variant="caption" color="text.secondary">
             © {new Date().getFullYear()} Le foyeR. Global. All rights reserved.
           </Typography>

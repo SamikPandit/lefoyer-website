@@ -61,6 +61,36 @@ const About = () => {
                 </Container>
             </Box>
 
+            {/* Made in India Section */}
+            <Box sx={{ py: 4, textAlign: 'center', backgroundColor: '#fff' }}>
+                <Container maxWidth="md">
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                        <Box
+                            component="img"
+                            src="/images/products/State_Emblem_of_India.png"
+                            alt="State Emblem of India"
+                            sx={{
+                                width: { xs: 150, md: 200 },
+                                height: 'auto',
+                                opacity: 0.8
+                            }}
+                        />
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                fontFamily: "'Cormorant Garamond', serif",
+                                color: 'text.secondary',
+                                letterSpacing: '0.1em',
+                                textTransform: 'uppercase',
+                                fontWeight: 600
+                            }}
+                        >
+                            Exclusively made in India
+                        </Typography>
+                    </Box>
+                </Container>
+            </Box>
+
             {/* The Hearth Section - Organic Layout */}
             <Container maxWidth="lg" sx={{ py: { xs: 8, md: 12 } }}>
                 <Grid container spacing={{ xs: 6, md: 12 }} alignItems="center">

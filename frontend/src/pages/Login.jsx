@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,8 @@ const Login = () => {
     setError('');
 
     try {
-      const success = await login({ username, password });
+      // Send email as username for backend compatibility
+      const success = await login({ username: email, password });
       if (success) {
         navigate('/');
       } else {
@@ -58,13 +59,13 @@ const Login = () => {
             margin="normal"
             required
             fullWidth
-            id="username"
-            label="Username"
-            name="username"
-            autoComplete="username"
+            id="email"
+            label="Email Address"
+            name="email"
+            autoComplete="email"
             autoFocus
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
           <TextField
             margin="normal"
