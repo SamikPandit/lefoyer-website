@@ -20,6 +20,7 @@ import { WishlistProvider } from './context/WishlistContext';
 import { CartProvider } from './context/CartContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/common/ScrollToTop';
+import { useEffect } from 'react';
 
 function App() {
   useEffect(() => {
