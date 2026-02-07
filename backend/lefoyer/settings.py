@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     'reviews',
     'django_filters',
     'coupons',
+    'shipping',
+    'django_celery_beat',
 ]
 
 JAZZMIN_SETTINGS = {
@@ -173,6 +175,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5174",
     "https://www.lefoyerglobal.com",
     "https://lefoyerglobal.com",
+    "http://localhost:3000",  # For local development
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -193,12 +196,74 @@ if PHONEPE_ENV == 'PRODUCTION':
     PHONEPE_SALT_KEY = os.getenv('PHONEPE_PROD_SALT_KEY')
     PHONEPE_SALT_INDEX = int(os.getenv('PHONEPE_PROD_SALT_INDEX', 1))
 else:
-    PHONEPE_MERCHANT_ID = os.getenv('PHONEPE_TEST_MERCHANT_ID')
-    PHONEPE_SALT_KEY = os.getenv('PHONEPE_TEST_SALT_KEY')
+    # Use standard UAT credentials if not provided in env
+    PHONEPE_MERCHANT_ID = os.getenv('PHONEPE_TEST_MERCHANT_ID', 'PGTESTPAYUAT')
+    PHONEPE_SALT_KEY = os.getenv('PHONEPE_TEST_SALT_KEY', '099eb0cd-02cf-4e2a-8aca-3e6c6aff0399')
     PHONEPE_SALT_INDEX = int(os.getenv('PHONEPE_TEST_SALT_INDEX', 1))
 
-PHONEPE_ENV = os.getenv("PHONEPE_ENV", "UAT")
 PHONEPE_CALLBACK_URL = os.getenv("PHONEPE_CALLBACK_URL", "http://localhost:8000/api/orders/payment/callback/")
 
 SITE_URL = os.getenv("SITE_URL", "http://localhost:5173")
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+
+# ============================================================================
+# CELERY Configuration
+# ============================================================================
+CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Kolkata'
+
+# Celery Beat Schedule
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    'register-daily-pickup': {
+        'task': 'shipping.tasks.register_daily_pickup',
+        'schedule': crontab(hour=16, minute=0),  # 4:00 PM IST daily
+    },
+    'poll-active-shipments': {
+        'task': 'shipping.tasks.poll_active_shipments',
+        'schedule': crontab(minute=0, hour='*/2'),  # Every 2 hours
+    },
+}
+
+# ============================================================================
+# BLUE DART SHIPPING Configuration
+# ============================================================================
+
+# Blue Dart API Credentials
+BLUEDART_LOGIN_ID = os.getenv('BLUEDART_LOGIN_ID', '')
+BLUEDART_LICENCE_KEY = os.getenv('BLUEDART_LICENCE_KEY', '')
+BLUEDART_CUSTOMER_CODE = os.getenv('BLUEDART_CUSTOMER_CODE', '')
+BLUEDART_COD_CUSTOMER_CODE = os.getenv('BLUEDART_COD_CUSTOMER_CODE', '')
+BLUEDART_TRACKING_LICENCE_KEY = os.getenv('BLUEDART_TRACKING_LICENCE_KEY', BLUEDART_LICENCE_KEY)
+
+# Warehouse/Origin Details
+BLUEDART_ORIGIN_AREA = os.getenv('BLUEDART_ORIGIN_AREA', 'BOM')
+BLUEDART_ORIGIN_PINCODE = os.getenv('BLUEDART_ORIGIN_PINCODE', '400001')
+BLUEDART_WAREHOUSE_NAME = os.getenv('BLUEDART_WAREHOUSE_NAME', 'Le Foyer Warehouse')
+BLUEDART_WAREHOUSE_ADDRESS = os.getenv('BLUEDART_WAREHOUSE_ADDRESS', '')
+BLUEDART_WAREHOUSE_CONTACT = os.getenv('BLUEDART_WAREHOUSE_CONTACT', 'Warehouse Manager')
+BLUEDART_WAREHOUSE_PHONE = os.getenv('BLUEDART_WAREHOUSE_PHONE', '')
+
+# Return Details
+BLUEDART_RETURN_ADDRESS = os.getenv('BLUEDART_RETURN_ADDRESS', BLUEDART_WAREHOUSE_ADDRESS)
+BLUEDART_RETURN_PINCODE = os.getenv('BLUEDART_RETURN_PINCODE', BLUEDART_ORIGIN_PINCODE)
+BLUEDART_RETURN_CONTACT = os.getenv('BLUEDART_RETURN_CONTACT', 'Returns Desk')
+BLUEDART_RETURN_PHONE = os.getenv('BLUEDART_RETURN_PHONE', BLUEDART_WAREHOUSE_PHONE)
+
+# Environment
+BLUEDART_DEMO_MODE = os.getenv('BLUEDART_DEMO_MODE', 'True').lower() == 'true'
+BLUEDART_TRACKING_POLL_INTERVAL = 120  # minutes
+
+# Default product settings for beauty products (lightweight parcels)
+BLUEDART_DEFAULT_PRODUCT_CODE = 'D'  # Domestic Priority (fast delivery)
+BLUEDART_DEFAULT_SUB_PRODUCT_CODE = 'P'  # Prepaid
+BLUEDART_DEFAULT_PACK_TYPE = 'N'  # Non-Documents
+BLUEDART_DEFAULT_WEIGHT_KG = float(os.getenv('BLUEDART_DEFAULT_WEIGHT_KG', '0.5'))
+BLUEDART_DEFAULT_LENGTH_CM = float(os.getenv('BLUEDART_DEFAULT_LENGTH_CM', '20'))
+BLUEDART_DEFAULT_WIDTH_CM = float(os.getenv('BLUEDART_DEFAULT_WIDTH_CM', '15'))
+BLUEDART_DEFAULT_HEIGHT_CM = float(os.getenv('BLUEDART_DEFAULT_HEIGHT_CM', '10'))
+

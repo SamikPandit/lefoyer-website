@@ -3,7 +3,7 @@ from django.conf import settings
 from products.models import Product
 
 class Wishlist(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     products = models.ManyToManyField(Product)
 
     def __str__(self):

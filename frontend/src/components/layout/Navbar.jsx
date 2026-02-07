@@ -40,13 +40,13 @@ const Navbar = () => {
       <AppBar
         position="fixed"
         sx={{
-          backgroundColor: isScrolled ? 'rgba(26, 26, 26, 0.95)' : 'transparent', // Dark background on scroll
-          backdropFilter: isScrolled ? 'blur(12px)' : 'none',
-          borderBottom: isScrolled ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+          backgroundColor: 'rgba(26, 26, 26, 0.95)', // Always dark background
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           transition: 'all 0.3s ease',
           boxShadow: 'none',
           py: 1,
-          color: isScrolled || !isHome ? 'white' : 'white', // Always white text for dark theme
+          color: 'white', // Always white text
         }}
       >
         <Container maxWidth="xl">

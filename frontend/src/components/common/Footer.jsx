@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Box, Container, Grid, Typography, Link, TextField, Button, Stack, IconButton } from '@mui/material';
+import { Box, Container, Grid, Typography, Link, TextField, Button, Stack, IconButton, Alert } from '@mui/material';
 import InstagramIcon from '@mui/icons-material/Instagram';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 const Footer = () => {
   const [email, setEmail] = useState('');
@@ -18,12 +19,44 @@ const Footer = () => {
       component="footer"
       sx={{
         bgcolor: '#FDFBF9',
-        pt: 10,
+        pt: 0,
         pb: 4,
         borderTop: '1px solid rgba(201, 169, 110, 0.1)'
       }}
     >
-      <Container maxWidth="lg">
+      {/* Security Disclaimer Banner */}
+      <Box sx={{ bgcolor: '#FFE6E6', py: 2.5 }}>
+        <Container maxWidth="lg">
+          <Alert
+            icon={<WarningAmberIcon />}
+            severity="error"
+            sx={{
+              bgcolor: 'transparent',
+              border: 'none',
+              '& .MuiAlert-icon': {
+                color: '#D32F2F'
+              },
+              '& .MuiAlert-message': {
+                width: '100%'
+              }
+            }}
+          >
+            <Typography
+              variant="body1"
+              sx={{
+                fontWeight: 600,
+                color: '#D32F2F',
+                textAlign: 'center',
+                fontSize: { xs: '0.875rem', sm: '1rem' }
+              }}
+            >
+              Please be careful of fraudulent calls & SMSes! Le foyeR. Global will never call you with offers, free gifts, or ask you for payments through links.
+            </Typography>
+          </Alert>
+        </Container>
+      </Box>
+
+      <Container maxWidth="lg" sx={{ pt: 10 }}>
         <Grid container spacing={8}>
 
           {/* Column 1: Brand */}

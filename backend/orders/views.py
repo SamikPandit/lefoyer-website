@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from .models import Order, OrderItem
 from .serializers import OrderSerializer
 from cart.models import Cart
@@ -15,9 +16,19 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Order.objects.filter(user=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        cart = Cart.objects.get(user=request.user)
-        if not cart.items.exists():
-            return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
+        # Try to get or create cart for the user
+        try:
+            cart = Cart.objects.get(user=request.user)
+        except Cart.DoesNotExist:
+            return Response({'error': 'Cart not found. Please add items to cart first.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if cart has items
+        cart_items = cart.items.all()
+        if not cart_items.exists():
+            return Response({
+                'error': 'Cart is empty',
+                'debug': f'Cart ID: {cart.id}, User: {request.user.username}, Item count: {cart_items.count()}'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Get shipping information from request data
         shipping_data = request.data.get('shipping_info', {})
@@ -46,6 +57,17 @@ class OrderViewSet(viewsets.ModelViewSet):
             except Coupon.DoesNotExist:
                 return Response({'error': 'Invalid coupon code'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Get additional info
+        payment_method = request.data.get('payment_method', 'PREPAID')
+        
+        # Determine initial payment status and valid payment methods
+        valid_methods = ['PREPAID', 'COD', 'upi', 'card'] # 'upi'/'card' from frontend map to PREPAID logic in model, or use them directly if model allows
+        
+        # Normalize payment method for model
+        model_payment_method = 'PREPAID'
+        if payment_method == 'cod' or payment_method == 'COD':
+            model_payment_method = 'COD'
+        
         order = Order.objects.create(
             user=request.user,
             first_name=first_name,
@@ -58,7 +80,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             pincode=pincode,
             total=total,
             coupon=coupon,
-            discount=discount
+            discount=discount,
+            payment_method=model_payment_method
         )
 
         for item in cart.items.all():
@@ -70,9 +93,79 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
 
         cart.items.all().delete()
+        
+        # Trigger shipment generation for COD orders immediately
+        if model_payment_method == 'COD':
+            from shipping.tasks import generate_shipment_for_order
+            # Delay to ensure transaction commit if needed, though here it's fine
+            generate_shipment_for_order.delay(order.id)
 
         serializer = OrderSerializer(order)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=['post'])
+    def complete_payment(self, request, pk=None):
+        """Endpoint to complete payment for a pending order"""
+        order = self.get_object()
+        
+        if order.payment_status == 'COMPLETED':
+            return Response(
+                {'error': 'Order already paid'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        payment_method = request.data.get('payment_method', 'PREPAID')
+        
+        # Normalize payment method
+        if payment_method.upper() in ['UPI', 'CARD', 'PHONEPE']:
+            payment_method = 'PREPAID'
+        elif payment_method.upper() == 'COD':
+            payment_method = 'COD'
+        
+        # Update payment method if changed
+        if order.payment_method != payment_method:
+            order.payment_method = payment_method
+            order.save()
+        
+        # For COD, mark as confirmed and trigger shipment
+        if payment_method == 'COD':
+            # COD orders don't need payment gateway
+            # Trigger shipment generation if not already done
+            try:
+                if not hasattr(order, 'shipment'):
+                    from shipping.tasks import generate_shipment_for_order
+                    generate_shipment_for_order.delay(order.id)
+            except:
+                pass
+            
+            return Response({
+                'success': True,
+                'message': 'COD order confirmed',
+                'order_id': order.id
+            })
+        
+        # For prepaid, trigger payment gateway
+        from .payment import PhonePeGateway
+        gateway = PhonePeGateway()
+        response = gateway.initiate_payment(
+            order_id=order.id,
+            amount=float(order.total),
+            user_id=request.user.id
+        )
+        
+        if response['success']:
+            order.provider_order_id = response['merchant_transaction_id']
+            order.save()
+            return Response({
+                'success': True,
+                'redirect_url': response['redirect_url']
+            })
+        else:
+            return Response(
+                {'success': False, 'error': 'Payment initiation failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 from rest_framework.views import APIView
 from django.shortcuts import redirect

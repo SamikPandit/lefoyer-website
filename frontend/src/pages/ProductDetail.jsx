@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
   Grid,
@@ -26,7 +26,8 @@ import {
   Favorite,
   LocalShipping,
   Verified,
-  Loop
+  Loop,
+  AttachMoney
 } from '@mui/icons-material';
 import { getProductBySlug } from '../services/api';
 import { useWishlist } from '../context/WishlistContext';
@@ -36,6 +37,7 @@ import ProductReviews from '../components/product/ProductReviews';
 
 const ProductDetail = () => {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState(0);
@@ -46,6 +48,11 @@ const ProductDetail = () => {
 
   const { wishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
+
+  // Scroll to top on product change  
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [slug]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -96,6 +103,18 @@ const ProductDetail = () => {
     setOpenSnackbar(true);
   };
 
+  const handleBuyNow = async () => {
+    const success = await addToCart(product, quantity);
+    if (success) {
+      // Small delay to ensure cart API has processed the item
+      await new Promise(resolve => setTimeout(resolve, 100));
+      navigate('/checkout');
+    } else {
+      setSnackbarMessage('Failed to add to cart');
+      setOpenSnackbar(true);
+    }
+  };
+
   if (!product) {
     return (
       <Container maxWidth="lg" sx={{ py: 4, textAlign: 'center' }}>
@@ -128,79 +147,93 @@ const ProductDetail = () => {
         </Box>
 
         {/* Main Product Section */}
-        <Box sx={{ backgroundColor: 'white', p: 3, mb: 3 }}>
-          <Grid container spacing={3}>
-            {/* Image Gallery - Left */}
-            <Grid item xs={12} md={1}>
-              <Box sx={{ display: 'flex', flexDirection: { xs: 'row', md: 'column' }, gap: 1, overflowX: { xs: 'auto', md: 'visible' } }}>
-                {images.map((image, index) => (
-                  <Box
-                    key={index}
-                    onClick={() => setSelectedImage(image)}
-                    sx={{
-                      width: { xs: 60, md: 70 },
-                      height: { xs: 60, md: 70 },
-                      flexShrink: 0,
-                      border: selectedImage === image ? '2px solid #C9A96E' : '1px solid #E0E0E0',
-                      borderRadius: 1,
-                      cursor: 'pointer',
-                      overflow: 'hidden',
-                      '&:hover': { borderColor: '#C9A96E' },
-                    }}
-                  >
-                    <img
-                      src={image}
-                      alt={`Product ${index + 1}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  </Box>
-                ))}
-              </Box>
-            </Grid>
+        {/* Main Product Section - Forced Side-by-Side Layout */}
+        <Box sx={{ backgroundColor: 'white', p: { xs: 1, md: 3 }, mb: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', gap: { xs: 2, md: 4 } }}>
 
-            {/* Main Image - Center */}
-            <Grid item xs={12} md={5}>
-              <Box
-                sx={{
-                  position: 'relative',
-                  width: '100%',
-                  height: { xs: 350, md: 500 },
-                  border: '1px solid #E0E0E0',
-                  borderRadius: 1,
-                  overflow: 'hidden',
-                  backgroundColor: '#F5F5F5',
-                }}
-              >
-                <img
-                  src={selectedImage}
-                  alt={product.name}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    padding: '20px'
+            {/* Left Side: Image Gallery (50% Width) */}
+            <Box sx={{ width: '50%', flexShrink: 0 }}>
+              <Box sx={{ display: 'flex', gap: { xs: 1, md: 2 }, flexDirection: { xs: 'column', sm: 'row' } }}>
+                {/* Thumbnail Images */}
+                <Box sx={{
+                  display: { xs: 'flex', sm: 'flex' },
+                  flexDirection: { xs: 'row', sm: 'column' },
+                  gap: 1,
+                  maxHeight: { xs: 60, sm: 500 },
+                  overflowX: { xs: 'auto', sm: 'visible' },
+                  overflowY: { xs: 'visible', sm: 'auto' },
+                  pr: { sm: 1 },
+                  mb: { xs: 1, sm: 0 },
+                  order: { xs: 2, sm: 1 } // Thumbnails below main image on mobile for better space
+                }}>
+                  {images.slice(0, 4).map((image, index) => (
+                    <Box
+                      key={index}
+                      onClick={() => setSelectedImage(image)}
+                      sx={{
+                        width: { xs: 50, sm: 70 },
+                        height: { xs: 50, sm: 70 },
+                        flexShrink: 0,
+                        border: selectedImage === image ? '2px solid #C9A96E' : '1px solid #E0E0E0',
+                        borderRadius: 1,
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        '&:hover': { borderColor: '#C9A96E' },
+                      }}
+                    >
+                      <img
+                        src={image}
+                        alt={`Product ${index + 1}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </Box>
+                  ))}
+                </Box>
+
+                {/* Main Image */}
+                <Box
+                  sx={{
+                    flex: 1,
+                    position: 'relative',
+                    height: { xs: 250, sm: 400, md: 500 },
+                    border: '1px solid #E0E0E0',
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    backgroundColor: '#F5F5F5',
+                    order: { xs: 1, sm: 2 }
                   }}
-                />
+                >
+                  <img
+                    src={selectedImage}
+                    alt={product.name}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      padding: '10px'
+                    }}
+                  />
+                </Box>
               </Box>
-            </Grid>
+            </Box>
 
-            {/* Product Info - Right */}
-            <Grid item xs={12} md={6}>
+            {/* Right Side: Product Info (50% Width) */}
+            <Box sx={{ width: '50%', flexShrink: 0 }}>
               <Box>
                 {/* Brand/Category */}
-                <Typography variant="body2" sx={{ color: 'primary.main', mb: 0.5, textTransform: 'uppercase', fontSize: '0.813rem' }}>
+                <Typography variant="body2" sx={{ color: 'primary.main', mb: 0.5, textTransform: 'uppercase', fontSize: { xs: '0.6rem', md: '0.813rem' } }}>
                   {product.category?.name}
                 </Typography>
 
                 {/* Product Name */}
-                <Typography variant="h4" sx={{ fontWeight: 500, mb: 1, fontSize: { xs: '1.5rem', md: '1.75rem' } }}>
+                <Typography variant="h4" sx={{ fontWeight: 500, mb: 1, fontSize: { xs: '1rem', sm: '1.5rem', md: '1.75rem' } }}>
                   {product.name}
                 </Typography>
 
                 {/* Rating & Reviews */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                   <Rating value={parseFloat(product.rating)} precision={0.5} readOnly size="small" />
-                  <Typography variant="body2" sx={{ color: 'primary.main', cursor: 'pointer' }}>
+                  <Typography variant="body2" sx={{ color: 'primary.main', cursor: 'pointer', fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
                     {product.reviews_count} reviews
                   </Typography>
                   {product.is_bestseller && (
@@ -213,14 +246,14 @@ const ProductDetail = () => {
                 {/* Price */}
                 <Box sx={{ mb: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 0.5 }}>
-                    <Typography variant="h4" sx={{ color: '#B12704', fontWeight: 500 }}>
+                    <Typography variant="h4" sx={{ color: '#B12704', fontWeight: 500, fontSize: { xs: '1.25rem', md: '2rem' } }}>
                       ₹{product.price}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
                       {product.size}
                     </Typography>
                   </Box>
-                  <Typography variant="body2" color="success.main" sx={{ fontWeight: 500 }}>
+                  <Typography variant="body2" color="success.main" sx={{ fontWeight: 500, fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
                     In Stock
                   </Typography>
                 </Box>
@@ -276,31 +309,69 @@ const ProductDetail = () => {
                 </Box>
 
                 {/* Action Buttons */}
-                <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 1.5 }}>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      onClick={handleBuyNow}
+                      sx={{
+                        backgroundColor: '#FF9900',
+                        '&:hover': { backgroundColor: '#FA8900' },
+                        textTransform: 'none',
+                        fontSize: '1rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      Buy Now
+                    </Button>
+                    <IconButton
+                      onClick={handleToggleWishlist}
+                      sx={{
+                        border: '1px solid #D5D9D9',
+                        borderRadius: 1,
+                        '&:hover': { backgroundColor: '#F7F7F7' }
+                      }}
+                    >
+                      {isWishlisted ? <Favorite color="error" /> : <FavoriteBorder />}
+                    </IconButton>
+                  </Box>
+
                   <Button
-                    variant="contained"
+                    variant="outlined"
                     fullWidth
                     size="large"
                     onClick={handleAddToCart}
                     sx={{
-                      backgroundColor: '#C9A96E',
-                      '&:hover': { backgroundColor: '#B08D55' },
+                      borderColor: '#C9A96E',
+                      color: '#C9A96E',
+                      '&:hover': {
+                        borderColor: '#B08D55',
+                        backgroundColor: 'rgba(201, 169, 110, 0.05)'
+                      },
                       textTransform: 'none',
                       fontSize: '1rem'
                     }}
                   >
                     Add to Cart
                   </Button>
-                  <IconButton
-                    onClick={handleToggleWishlist}
-                    sx={{
-                      border: '1px solid #D5D9D9',
-                      borderRadius: 1,
-                      '&:hover': { backgroundColor: '#F7F7F7' }
-                    }}
-                  >
-                    {isWishlisted ? <Favorite color="error" /> : <FavoriteBorder />}
-                  </IconButton>
+                </Box>
+
+                {/* Cash on Delivery Badge */}
+                <Box sx={{
+                  backgroundColor: '#E7F6E7',
+                  p: 1.5,
+                  borderRadius: 1,
+                  mb: 2,
+                  border: '1px solid #4CAF50'
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <AttachMoney sx={{ color: '#4CAF50', fontSize: 20 }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#2E7D32' }}>
+                      Cash on Delivery Available
+                    </Typography>
+                  </Box>
                 </Box>
 
                 {/* Amazon Link */}
@@ -350,8 +421,8 @@ const ProductDetail = () => {
                   </Box>
                 </Box>
               </Box>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         </Box>
 
         {/* Product Details Tabs */}
@@ -447,8 +518,8 @@ const ProductDetail = () => {
             {snackbarMessage}
           </Alert>
         </Snackbar>
-      </Container>
-    </Box>
+      </Container >
+    </Box >
   );
 };
 

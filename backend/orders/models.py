@@ -27,6 +27,10 @@ class Order(models.Model):
         ('COMPLETED', 'Completed'),
         ('FAILED', 'Failed'),
     ])
+    payment_method = models.CharField(max_length=20, default='PREPAID', choices=[
+        ('PREPAID', 'Prepaid'),
+        ('COD', 'Cash on Delivery'),
+    ])
 
     class Meta:
         ordering = ('-created_at',)

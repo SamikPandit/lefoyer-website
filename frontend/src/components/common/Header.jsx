@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 
 const Header = () => {
   return (
-    <AppBar position="sticky" sx={{ backgroundColor: 'background.default', color: 'text.primary' }} elevation={0}>
+    <AppBar position="sticky" sx={{ backgroundColor: '#000000', color: '#ffffff' }} elevation={0}>
       <Toolbar sx={{ justifyContent: 'space-between', py: 1 }}>
         <Typography
           variant="h5"

@@ -14,6 +14,7 @@ import FAQ from './pages/FAQ';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Profile from './pages/Profile';
+import OrderDetail from './pages/OrderDetail';
 import Layout from './components/layout/Layout';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
@@ -87,6 +88,11 @@ function App() {
                 <Route path="/profile" element={
                   <ProtectedRoute>
                     <Profile />
+                  </ProtectedRoute>
+                } />
+                <Route path="/orders/:id" element={
+                  <ProtectedRoute>
+                    <OrderDetail />
                   </ProtectedRoute>
                 } />
                 <Route path="*" element={<div>Page not found</div>} />

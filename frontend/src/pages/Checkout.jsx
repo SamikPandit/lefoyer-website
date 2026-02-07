@@ -87,10 +87,11 @@ const Checkout = () => {
                 } else {
                     alert('No redirect URL received');
                 }
-            } else {
+            } else if (formData.paymentMethod === 'cod') {
                 // COD Flow
-                clearCart();
-                navigate('/order-confirmation');
+                await clearCart();
+                // Pass order details to confirmation page if needed, or just navigate
+                navigate('/order-confirmation', { state: { orderId: orderId, status: 'success' } });
             }
 
         } catch (error) {
@@ -205,11 +206,20 @@ const Checkout = () => {
                                     <Typography variant="h6" sx={{ mb: 3 }}>Payment Method</Typography>
                                     <RadioGroup name="paymentMethod" value={formData.paymentMethod} onChange={handleInputChange}>
                                         <FormControlLabel value="upi" control={<Radio />} label="UPI (PhonePe)" />
+                                        <FormControlLabel value="cod" control={<Radio />} label="Cash on Delivery" />
                                     </RadioGroup>
 
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                                        Secure payment via PhonePe. You will be redirected to complete the payment.
-                                    </Typography>
+                                    {formData.paymentMethod === 'upi' && (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                                            Secure payment via PhonePe. You will be redirected to complete the payment.
+                                        </Typography>
+                                    )}
+
+                                    {formData.paymentMethod === 'cod' && (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                                            Pay with cash or UPI upon delivery. No advance payment required.
+                                        </Typography>
+                                    )}
 
                                     <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
                                         <Button onClick={handleBack}>Back</Button>

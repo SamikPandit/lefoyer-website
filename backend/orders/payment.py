@@ -12,7 +12,14 @@ class PhonePeGateway:
         self.client_id = settings.PHONEPE_MERCHANT_ID
         self.client_secret = settings.PHONEPE_SALT_KEY
         self.client_version = settings.PHONEPE_SALT_INDEX
-        self.env = Env.SANDBOX if settings.PHONEPE_ENV == 'SANDBOX' else Env.PRODUCTION
+        
+        # Robust Environment Mapping
+        env_str = str(settings.PHONEPE_ENV).upper()
+        if env_str in ['PRODUCTION', 'PROD']:
+            self.env = Env.PRODUCTION
+        else:
+            self.env = Env.SANDBOX
+            
         self.client = StandardCheckoutClient(
             client_id=self.client_id,
             client_secret=self.client_secret,
