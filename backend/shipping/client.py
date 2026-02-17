@@ -140,6 +140,59 @@ class BlueDartClient:
             'Area': self.origin_area,
         }
     
+    def _create_dimensions(self, dims_dict, client):
+        """
+        Create the Angle of Dimension object structure required by data contract.
+        
+        Args:
+            dims_dict: Dictionary with length_cm, width_cm, height_cm
+            client: The Zeep client instance to get types from
+            
+        Returns:
+            The ArrayOfDimension object
+        """
+        try:
+            # Get types from the client
+            # Note: The namespace prefix (ns2) might vary, but get_type handles it usually
+            # or we iterate to find it.
+            
+            # Based on WSDL dump: 
+            # ns2:ArrayOfDimension
+            # ns2:Dimension(Breadth: xsd:double, Count: xsd:int, Height: xsd:double, Length: xsd:double)
+            
+            # Find the namespace for data types (usually ends in WayBillGeneration)
+            ns = None
+            for key, val in client.namespaces.items():
+                if 'WayBillGeneration' in val:
+                    ns = key
+                    break
+            
+            type_prefix = f"{ns}:" if ns else ""
+            
+            DimensionType = client.get_type(f'{type_prefix}Dimension')
+            ArrayOfDimensionType = client.get_type(f'{type_prefix}ArrayOfDimension')
+            
+            dim = DimensionType(
+                Length=float(dims_dict['length_cm']),
+                Breadth=float(dims_dict['width_cm']),
+                Height=float(dims_dict['height_cm']),
+                Count=1
+            )
+            
+            return ArrayOfDimensionType(Dimension=[dim])
+            
+        except Exception as e:
+            logger.error(f"Error creating dimension object: {e}")
+            # Fallback to dictionary list if type creation fails (though likely to fail at SOAP level)
+            return {
+                'Dimension': [{
+                    'Length': float(dims_dict['length_cm']),
+                    'Breadth': float(dims_dict['width_cm']),
+                    'Height': float(dims_dict['height_cm']),
+                    'Count': 1
+                }]
+            }
+
     def check_serviceability(self, pincode):
         """
         Check if Blue Dart services this pincode.
@@ -364,23 +417,18 @@ class BlueDartClient:
                 'InvoiceNo': f"INV-{order.id}",
                 'ItemCount': order.items.count(),
                 'PieceCount': str(order.items.count()),
+                'PieceCount': str(order.items.count()),
                 'ProductCode': product_code,
                 'SubProductCode': sub_product_code,
-                'ProductType': 0,  # 0=Forward shipment
+                'ProductType': 'Dutiables',  # 'Dutiables' for non-documents, 'Docs' for documents
                 'PackType': PACK_TYPE_NON_DOCUMENTS,
                 'PDFOutputNotRequired': False,  # We want the PDF label
                 'RegisterPickup': False,  # Manual pickup registration via scheduled task
-                'PickupDate': to_bluedart_date(datetime.now()),
+                'PickupDate': datetime.now(),
                 'PickupTime': '1600',
-                'Dimensions': [
-                    {
-                        'Length': int(dimensions['length_cm']),
-                        'Breadth': int(dimensions['width_cm']),
-                        'Height': int(dimensions['height_cm']),
-                        'Count': 1
-                    }
-                ],
-                'OTPBasedDelivery': 2,  # 0=No, 1=OTP required, 2=No
+                # Dimensions fixed to use correct WSDL type structure
+                'Dimensions': self._create_dimensions(dimensions, self.waybill_client),
+                'OTPBasedDelivery': 'Default',  # 'Default' = No OTP check usually
                 'SpecialInstruction': 'Handle with care - fragile beauty products',
             },
             'Shipper': {
@@ -404,7 +452,31 @@ class BlueDartClient:
             
             # Check for errors
             if hasattr(response, 'IsError') and response.IsError:
-                error_msg = getattr(response, 'ErrorMessage', 'Unknown error')
+                # Check multiple error fields
+                error_msg = (
+                    getattr(response, 'ErrorMessage', None)
+                    or getattr(response, 'StatusMessage', None)
+                    or getattr(response, 'Status', None)
+                )
+                
+                # Check for status list/array
+                if not error_msg:
+                    status_array = getattr(response, 'Status', None)
+                    if status_array and hasattr(status_array, 'WayBillGenerationStatus'):
+                        statuses = status_array.WayBillGenerationStatus
+                        if isinstance(statuses, list):
+                            error_msg = "; ".join([s.StatusInformation for s in statuses if s.StatusInformation])
+                        else:
+                             error_msg = getattr(statuses, 'StatusInformation', None)
+
+                if not error_msg:
+                    error_msg = 'Unknown error'
+
+                # Also check for error list
+                error_list = getattr(response, 'ErrorMessageList', None)
+                if error_list:
+                    logger.error(f"Error list: {error_list}")
+                
                 logger.error(f"Waybill generation failed for order #{order.id}: {error_msg}")
                 return {
                     'awb_number': None,
@@ -609,7 +681,7 @@ class BlueDartClient:
             'ContactPersonName': settings.BLUEDART_WAREHOUSE_CONTACT,
             'CustomerTelephoneNumber': settings.BLUEDART_WAREHOUSE_PHONE.replace('+91', '').replace('-', '').replace(' ', '')[:10],
             'MobileTelNo': settings.BLUEDART_WAREHOUSE_PHONE.replace('+91', '').replace('-', '').replace(' ', '')[:10],
-            'ShipmentPickupDate': to_bluedart_date(pickup_date),
+            'ShipmentPickupDate': pickup_date,
             'ShipmentPickupTime': pickup_time.replace(':', ''),  # Convert HH:MM to HHMM
             'OfficeCloseTime': close_time.replace(':', ''),
             'NumberofPieces': total_pieces,

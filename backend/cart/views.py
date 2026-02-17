@@ -25,12 +25,26 @@ class CartViewSet(viewsets.ViewSet):
         except Product.DoesNotExist:
             return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        cart_item, created = CartItem.objects.get_or_create(cart=cart, product=product)
-        if not created:
-            cart_item.quantity += quantity
+        # Check stock availability
+        cart_item_existing = CartItem.objects.filter(cart=cart, product=product).first()
+        current_qty = cart_item_existing.quantity if cart_item_existing else 0
+        total_requested = current_qty + quantity
+
+        if total_requested > product.stock_quantity:
+            return Response(
+                {
+                    'error': f'Only {product.stock_quantity} units available',
+                    'available': product.stock_quantity,
+                    'in_cart': current_qty
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if cart_item_existing:
+            cart_item_existing.quantity = total_requested
+            cart_item_existing.save()
         else:
-            cart_item.quantity = quantity
-        cart_item.save()
+            CartItem.objects.create(cart=cart, product=product, quantity=quantity)
 
         serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
@@ -38,12 +52,21 @@ class CartViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['patch'])
     def update_item(self, request, pk=None):
         try:
-            cart_item = CartItem.objects.get(id=pk, cart__user=request.user)
+            cart_item = CartItem.objects.select_related('product').get(id=pk, cart__user=request.user)
         except CartItem.DoesNotExist:
             return Response({'error': 'Cart item not found'}, status=status.HTTP_404_NOT_FOUND)
 
         quantity = int(request.data.get('quantity', 1))
         if quantity > 0:
+            # Validate against stock
+            if quantity > cart_item.product.stock_quantity:
+                return Response(
+                    {
+                        'error': f'Only {cart_item.product.stock_quantity} units available',
+                        'available': cart_item.product.stock_quantity,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             cart_item.quantity = quantity
             cart_item.save()
         else:

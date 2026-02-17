@@ -10,22 +10,24 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from .env
+load_dotenv(BASE_DIR / '.env')
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+# ============================================================================
+# SECURITY
+# ============================================================================
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-only-change-me')
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-yoursecretkey'
+DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'www.lefoyerglobal.com', 'lefoyerglobal.com']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -104,12 +106,34 @@ WSGI_APPLICATION = 'lefoyer.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DATABASE_URL = os.getenv('DATABASE_URL', '')
+
+if DATABASE_URL and not DEBUG:
+    # Production: Use PostgreSQL from DATABASE_URL
+    try:
+        import dj_database_url
+        DATABASES = {
+            'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+        }
+    except ImportError:
+        import logging
+        logging.getLogger(__name__).warning(
+            "dj-database-url not installed. Install with: pip install dj-database-url. Falling back to SQLite."
+        )
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+else:
+    # Development: Use SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
 
 
 # Password validation
@@ -163,30 +187,42 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10
+    'PAGE_SIZE': 10,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '30/minute',
+        'user': '120/minute',
+    },
 }
 
 AUTH_USER_MODEL = 'accounts.User'
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-    "https://www.lefoyerglobal.com",
-    "https://lefoyerglobal.com",
-    "http://localhost:3000",  # For local development
-]
+# CORS: environment-specific origins
+if DEBUG:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:3000",
+        "https://www.lefoyerglobal.com",
+        "https://lefoyerglobal.com",
+    ]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "https://www.lefoyerglobal.com",
+        "https://lefoyerglobal.com",
+    ]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://www.lefoyerglobal.com",
     "https://lefoyerglobal.com",
 ]
 
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+# dotenv already loaded at top of file
 
 # PhonePe Configuration
 PHONEPE_ENV = os.getenv('PHONEPE_ENV', 'SANDBOX')
@@ -207,6 +243,17 @@ SITE_URL = os.getenv("SITE_URL", "http://localhost:5173")
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 # ============================================================================
+# EMAIL Configuration (Hostinger SMTP)
+# ============================================================================
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.hostinger.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 465))
+EMAIL_USE_SSL = True
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'support@lefoyerglobal.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Le foyeR. <support@lefoyerglobal.com>')
+
+# ============================================================================
 # CELERY Configuration
 # ============================================================================
 CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
@@ -215,6 +262,9 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Kolkata'
+CELERY_TASK_ACKS_LATE = True  # Re-deliver tasks if worker crashes
+CELERY_RESULT_EXPIRES = 3600  # Delete task results after 1 hour
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Fair task distribution
 
 # Celery Beat Schedule
 from celery.schedules import crontab

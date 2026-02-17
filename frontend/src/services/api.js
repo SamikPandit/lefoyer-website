@@ -23,7 +23,8 @@ api.interceptors.response.use(
       if (localStorage.getItem('authToken')) {
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
-        window.location.reload();
+        // Redirect to login page instead of reloading
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);
@@ -41,6 +42,8 @@ export const getSubCategories = (params) => api.get('products/subcategories/', {
 // Auth APIs
 export const loginUser = (credentials) => api.post('token/', credentials);
 export const registerUser = (userData) => api.post('auth/register/', userData);
+export const verifyEmail = (token) => api.get(`auth/verify-email/${token}/`);
+export const resendVerification = (email) => api.post('auth/resend-verification/', { email });
 
 // Order APIs
 export const createOrder = (orderData) => api.post('orders/', orderData);

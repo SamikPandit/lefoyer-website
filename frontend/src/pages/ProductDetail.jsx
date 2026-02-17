@@ -44,6 +44,7 @@ const ProductDetail = () => {
   const [selectedImage, setSelectedImage] = useState('');
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   const [isWishlisted, setIsWishlisted] = useState(false);
 
   const { wishlist, addToWishlist, removeFromWishlist } = useWishlist();
@@ -74,44 +75,62 @@ const ProductDetail = () => {
   }, [wishlist, product]);
 
   const handleQuantityChange = (amount) => {
-    setQuantity((prev) => Math.max(1, prev + amount));
+    setQuantity((prev) => {
+      const next = prev + amount;
+      const maxQty = product?.available_quantity || product?.stock_quantity || 99;
+      return Math.max(1, Math.min(next, maxQty));
+    });
   };
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
 
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setOpenSnackbar(true);
+  };
+
   const handleToggleWishlist = async () => {
     let success;
     if (isWishlisted) {
       success = await removeFromWishlist(product.id);
-      setSnackbarMessage(success ? 'Removed from wishlist' : 'Failed');
+      showSnackbar(success ? 'Removed from wishlist' : 'Failed', success ? 'success' : 'error');
     } else {
       success = await addToWishlist(product.id);
-      setSnackbarMessage(success ? 'Added to wishlist' : 'Failed');
+      showSnackbar(success ? 'Added to wishlist' : 'Failed', success ? 'success' : 'error');
     }
-    setOpenSnackbar(true);
   };
 
   const handleAddToCart = async () => {
-    const success = await addToCart(product, quantity);
-    if (success) {
-      setSnackbarMessage('Added to cart');
-    } else {
-      setSnackbarMessage('Failed to add to cart');
+    if (!product.in_stock) {
+      showSnackbar('This product is currently out of stock', 'error');
+      return;
     }
-    setOpenSnackbar(true);
+    const result = await addToCart(product, quantity);
+    if (result === true) {
+      showSnackbar('Added to cart');
+    } else if (typeof result === 'string') {
+      showSnackbar(result, 'error');
+    } else {
+      showSnackbar('Failed to add to cart', 'error');
+    }
   };
 
   const handleBuyNow = async () => {
-    const success = await addToCart(product, quantity);
-    if (success) {
-      // Small delay to ensure cart API has processed the item
+    if (!product.in_stock) {
+      showSnackbar('This product is currently out of stock', 'error');
+      return;
+    }
+    const result = await addToCart(product, quantity);
+    if (result === true) {
       await new Promise(resolve => setTimeout(resolve, 100));
       navigate('/checkout');
+    } else if (typeof result === 'string') {
+      showSnackbar(result, 'error');
     } else {
-      setSnackbarMessage('Failed to add to cart');
-      setOpenSnackbar(true);
+      showSnackbar('Failed to add to cart', 'error');
     }
   };
 
@@ -136,6 +155,11 @@ const ProductDetail = () => {
     product.image_10
   ].filter(Boolean);
 
+  const isInStock = product.in_stock !== undefined ? product.in_stock : (product.stock_quantity > 0);
+  const availableQty = product.available_quantity || product.stock_quantity || 0;
+  const effectivePrice = product.discount_price && product.discount_price > 0 ? product.discount_price : product.price;
+  const hasDiscount = product.discount_price && product.discount_price > 0 && product.discount_price < product.price;
+
   return (
     <Box sx={{ backgroundColor: '#FAFAFA', minHeight: '100vh', py: 3 }}>
       <Container maxWidth="lg">
@@ -147,7 +171,6 @@ const ProductDetail = () => {
         </Box>
 
         {/* Main Product Section */}
-        {/* Main Product Section - Forced Side-by-Side Layout */}
         <Box sx={{ backgroundColor: 'white', p: { xs: 1, md: 3 }, mb: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', gap: { xs: 2, md: 4 } }}>
 
@@ -164,7 +187,7 @@ const ProductDetail = () => {
                   overflowY: { xs: 'visible', sm: 'auto' },
                   pr: { sm: 1 },
                   mb: { xs: 1, sm: 0 },
-                  order: { xs: 2, sm: 1 } // Thumbnails below main image on mobile for better space
+                  order: { xs: 2, sm: 1 }
                 }}>
                   {images.slice(0, 4).map((image, index) => (
                     <Box
@@ -247,15 +270,32 @@ const ProductDetail = () => {
                 <Box sx={{ mb: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 0.5 }}>
                     <Typography variant="h4" sx={{ color: '#B12704', fontWeight: 500, fontSize: { xs: '1.25rem', md: '2rem' } }}>
-                      ₹{product.price}
+                      ₹{effectivePrice}
                     </Typography>
+                    {hasDiscount && (
+                      <Typography variant="body1" sx={{ textDecoration: 'line-through', color: '#999', fontSize: { xs: '0.9rem', md: '1.1rem' } }}>
+                        ₹{product.price}
+                      </Typography>
+                    )}
                     <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
                       {product.size}
                     </Typography>
                   </Box>
-                  <Typography variant="body2" color="success.main" sx={{ fontWeight: 500, fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
-                    In Stock
-                  </Typography>
+                  {hasDiscount && (
+                    <Typography variant="body2" sx={{ color: '#28a745', fontWeight: 600, mb: 0.5 }}>
+                      Save {Math.round((1 - product.discount_price / product.price) * 100)}%
+                    </Typography>
+                  )}
+                  {/* Real stock status */}
+                  {isInStock ? (
+                    <Typography variant="body2" color="success.main" sx={{ fontWeight: 500, fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
+                      In Stock {availableQty <= 5 && availableQty > 0 ? `(Only ${availableQty} left)` : ''}
+                    </Typography>
+                  ) : (
+                    <Typography variant="body2" color="error.main" sx={{ fontWeight: 500, fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
+                      Out of Stock
+                    </Typography>
+                  )}
                 </Box>
 
                 <Divider sx={{ my: 2 }} />
@@ -295,16 +335,21 @@ const ProductDetail = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #D5D9D9', borderRadius: 1 }}>
-                      <IconButton size="small" onClick={() => handleQuantityChange(-1)} sx={{ borderRadius: 0 }}>
+                      <IconButton size="small" onClick={() => handleQuantityChange(-1)} disabled={!isInStock} sx={{ borderRadius: 0 }}>
                         <Remove fontSize="small" />
                       </IconButton>
                       <Typography sx={{ px: 2, minWidth: 40, textAlign: 'center', fontWeight: 500 }}>
                         {quantity}
                       </Typography>
-                      <IconButton size="small" onClick={() => handleQuantityChange(1)} sx={{ borderRadius: 0 }}>
+                      <IconButton size="small" onClick={() => handleQuantityChange(1)} disabled={!isInStock || quantity >= availableQty} sx={{ borderRadius: 0 }}>
                         <Add fontSize="small" />
                       </IconButton>
                     </Box>
+                    {isInStock && availableQty <= 10 && (
+                      <Typography variant="caption" color="text.secondary">
+                        Max: {availableQty}
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
 
@@ -316,15 +361,17 @@ const ProductDetail = () => {
                       fullWidth
                       size="large"
                       onClick={handleBuyNow}
+                      disabled={!isInStock}
                       sx={{
                         backgroundColor: '#FF9900',
                         '&:hover': { backgroundColor: '#FA8900' },
                         textTransform: 'none',
                         fontSize: '1rem',
-                        fontWeight: 600
+                        fontWeight: 600,
+                        '&.Mui-disabled': { backgroundColor: '#ccc' }
                       }}
                     >
-                      Buy Now
+                      {isInStock ? 'Buy Now' : 'Out of Stock'}
                     </Button>
                     <IconButton
                       onClick={handleToggleWishlist}
@@ -343,6 +390,7 @@ const ProductDetail = () => {
                     fullWidth
                     size="large"
                     onClick={handleAddToCart}
+                    disabled={!isInStock}
                     sx={{
                       borderColor: '#C9A96E',
                       color: '#C9A96E',
@@ -374,13 +422,13 @@ const ProductDetail = () => {
                   </Box>
                 </Box>
 
-                {/* Amazon Link */}
-                {(product.name.includes('Whitewave') || product.name.includes('Spotless')) && (
+                {/* Amazon Link - from model field */}
+                {product.amazon_link && (
                   <Button
                     variant="outlined"
                     fullWidth
                     size="large"
-                    href={product.name.includes('Whitewave') ? "https://amzn.in/d/9JVPdnF" : "https://amzn.in/d/0h6KdHF"}
+                    href={product.amazon_link}
                     target="_blank"
                     sx={{
                       mb: 2,
@@ -514,7 +562,7 @@ const ProductDetail = () => {
 
         {/* Snackbar */}
         <Snackbar open={openSnackbar} autoHideDuration={3000} onClose={() => setOpenSnackbar(false)}>
-          <Alert severity="success" sx={{ width: '100%' }}>
+          <Alert severity={snackbarSeverity} sx={{ width: '100%' }}>
             {snackbarMessage}
           </Alert>
         </Snackbar>

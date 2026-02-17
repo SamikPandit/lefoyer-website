@@ -7,6 +7,37 @@ from .serializers import OrderSerializer
 from cart.models import Cart
 from coupons.models import Coupon
 from django.utils import timezone
+from django.db import transaction
+from django.db.models import F
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def send_order_email_async(order_id):
+    """Send order confirmation email via Celery (non-blocking)."""
+    try:
+        from accounts.tasks import send_order_confirmation_email_task
+        send_order_confirmation_email_task.delay(order_id)
+    except Exception as e:
+        logger.error(f"Failed to queue order confirmation email for order #{order_id}: {e}")
+
+
+def get_effective_price(product):
+    """Return discount_price if set, otherwise regular price."""
+    if product.discount_price and product.discount_price > 0:
+        return product.discount_price
+    return product.price
+
+
+def restore_stock_for_order(order):
+    """Restore stock quantities for all items in an order."""
+    for item in order.items.select_related('product').all():
+        item.product.__class__.objects.filter(pk=item.product.pk).update(
+            stock_quantity=F('stock_quantity') + item.quantity
+        )
+    logger.info(f"Stock restored for order #{order.id}")
+
 
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
@@ -16,19 +47,38 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Order.objects.filter(user=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        # Try to get or create cart for the user
+        # Get cart
         try:
             cart = Cart.objects.get(user=request.user)
         except Cart.DoesNotExist:
-            return Response({'error': 'Cart not found. Please add items to cart first.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Cart not found. Please add items to cart first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Check if cart has items
-        cart_items = cart.items.all()
+        cart_items = cart.items.select_related('product').all()
         if not cart_items.exists():
-            return Response({
-                'error': 'Cart is empty',
-                'debug': f'Cart ID: {cart.id}, User: {request.user.username}, Item count: {cart_items.count()}'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Cart is empty'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate stock availability
+        out_of_stock = []
+        for item in cart_items:
+            if item.product.stock_quantity < item.quantity:
+                out_of_stock.append({
+                    'product': item.product.name,
+                    'available': item.product.stock_quantity,
+                    'requested': item.quantity
+                })
+        
+        if out_of_stock:
+            return Response(
+                {'error': 'Some items are out of stock', 'items': out_of_stock},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Get shipping information from request data
         shipping_data = request.data.get('shipping_info', {})
@@ -42,63 +92,103 @@ class OrderViewSet(viewsets.ModelViewSet):
         pincode = shipping_data.get('pincode')
 
         if not all([first_name, last_name, email, phone, address, city, state, pincode]):
-            return Response({'error': 'Missing shipping information'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Missing shipping information'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        total = sum(item.product.price * item.quantity for item in cart.items.all())
+        # Calculate total using effective price (discount_price if available)
+        total = sum(get_effective_price(item.product) * item.quantity for item in cart_items)
 
+        # Validate and apply coupon
         coupon_code = request.data.get('coupon_code')
         coupon = None
         discount = 0
         if coupon_code:
-            now = timezone.now()
             try:
-                coupon = Coupon.objects.get(code__iexact=coupon_code, valid_from__lte=now, valid_to__gte=now, active=True)
+                coupon = Coupon.objects.get(code__iexact=coupon_code)
+                
+                if not coupon.is_valid():
+                    return Response(
+                        {'error': 'This coupon is no longer valid'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                if coupon.min_order_amount and total < coupon.min_order_amount:
+                    return Response(
+                        {'error': f'Minimum order of ₹{coupon.min_order_amount} required for this coupon'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
                 discount = coupon.discount
             except Coupon.DoesNotExist:
-                return Response({'error': 'Invalid coupon code'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {'error': 'Invalid coupon code'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        # Get additional info
+        # Calculate final total after discount
+        discount_amount = total * discount / 100
+        final_total = total - discount_amount
+
+        # Get and normalize payment method
         payment_method = request.data.get('payment_method', 'PREPAID')
-        
-        # Determine initial payment status and valid payment methods
-        valid_methods = ['PREPAID', 'COD', 'upi', 'card'] # 'upi'/'card' from frontend map to PREPAID logic in model, or use them directly if model allows
-        
-        # Normalize payment method for model
-        model_payment_method = 'PREPAID'
-        if payment_method == 'cod' or payment_method == 'COD':
-            model_payment_method = 'COD'
-        
-        order = Order.objects.create(
-            user=request.user,
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            phone=phone,
-            address=address,
-            city=city,
-            state=state,
-            pincode=pincode,
-            total=total,
-            coupon=coupon,
-            discount=discount,
-            payment_method=model_payment_method
-        )
+        model_payment_method = 'COD' if payment_method.upper() == 'COD' else 'PREPAID'
 
-        for item in cart.items.all():
-            OrderItem.objects.create(
-                order=order,
-                product=item.product,
-                price=item.product.price,
-                quantity=item.quantity
+        # Wrap order creation in an atomic transaction
+        try:
+            with transaction.atomic():
+                order = Order.objects.create(
+                    user=request.user,
+                    first_name=first_name,
+                    last_name=last_name,
+                    email=email,
+                    phone=phone,
+                    address=address,
+                    city=city,
+                    state=state,
+                    pincode=pincode,
+                    total=final_total,
+                    coupon=coupon,
+                    discount=discount,
+                    payment_method=model_payment_method,
+                    # COD orders are immediately confirmed
+                    paid=model_payment_method == 'COD',
+                    payment_status='COMPLETED' if model_payment_method == 'COD' else 'PENDING',
+                )
+
+                for item in cart_items:
+                    OrderItem.objects.create(
+                        order=order,
+                        product=item.product,
+                        price=get_effective_price(item.product),
+                        quantity=item.quantity
+                    )
+                    # Reduce stock quantity atomically
+                    updated = item.product.__class__.objects.filter(
+                        pk=item.product.pk,
+                        stock_quantity__gte=item.quantity
+                    ).update(stock_quantity=F('stock_quantity') - item.quantity)
+                    
+                    if not updated:
+                        raise ValueError(f'{item.product.name} is now out of stock')
+
+                # Increment coupon usage
+                if coupon:
+                    Coupon.objects.filter(pk=coupon.pk).update(used_count=F('used_count') + 1)
+
+                cart.items.all().delete()
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        cart.items.all().delete()
-        
-        # Trigger shipment generation for COD orders immediately
-        if model_payment_method == 'COD':
-            from shipping.tasks import generate_shipment_for_order
-            # Delay to ensure transaction commit if needed, though here it's fine
-            generate_shipment_for_order.delay(order.id)
+        # NOTE: Shipment generation is handled automatically by the post_save signal
+        # in shipping/signals.py when payment_status='COMPLETED'
+
+        # Send order confirmation email asynchronously via Celery
+        send_order_email_async(order.id)
 
         serializer = OrderSerializer(order)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -129,13 +219,15 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         # For COD, mark as confirmed and trigger shipment
         if payment_method == 'COD':
-            # COD orders don't need payment gateway
-            # Trigger shipment generation if not already done
+            order.paid = True
+            order.payment_status = 'COMPLETED'
+            order.save()
+
             try:
                 if not hasattr(order, 'shipment'):
                     from shipping.tasks import generate_shipment_for_order
                     generate_shipment_for_order.delay(order.id)
-            except:
+            except Exception:
                 pass
             
             return Response({
@@ -199,7 +291,10 @@ class InitiatePaymentView(APIView):
             order.save()
             return Response({'redirect_url': response['redirect_url']})
         else:
-            return Response({'error': 'Payment initiation failed', 'details': response.get('error')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {'error': 'Payment initiation failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 @method_decorator(csrf_exempt, name='dispatch')
 class PaymentCallbackView(APIView):
@@ -228,8 +323,11 @@ class PaymentCallbackView(APIView):
                         order.payment_status = 'COMPLETED'
                         order.payment_id = transaction_id
                         order.save()
+                        
+                        # Send order confirmation email asynchronously via Celery
+                        send_order_email_async(order.id)
                     except Order.DoesNotExist:
-                        pass # Log error
+                        logger.error(f"Order not found for transaction: {merchant_transaction_id}")
                         
                 elif decoded_response.get('code') == 'PAYMENT_ERROR':
                      merchant_transaction_id = decoded_response['data']['merchantTransactionId']
@@ -237,15 +335,18 @@ class PaymentCallbackView(APIView):
                         order = Order.objects.get(provider_order_id=merchant_transaction_id)
                         order.payment_status = 'FAILED'
                         order.save()
+                        # Restore stock for failed payment
+                        restore_stock_for_order(order)
                      except Order.DoesNotExist:
-                        pass
+                        logger.error(f"Order not found for failed transaction: {merchant_transaction_id}")
 
                 return Response({'status': 'success'})
             else:
-                # Redirect return (if configured to POST to this URL)
-                # Usually PhonePe redirects to a URL with POST data
-                # We should handle it or have a separate view for UI redirect
                 return Response({'status': 'ok'})
 
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"Payment callback error: {e}")
+            return Response(
+                {'error': 'Payment processing error'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

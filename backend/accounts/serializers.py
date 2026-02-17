@@ -1,10 +1,10 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
 from django.conf import settings
+from .tasks import send_verification_email_task, send_password_reset_email_task
 
 User = get_user_model()
 
@@ -20,6 +20,12 @@ class UserSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name', ''),
             phone_number=validated_data.get('phone_number', '')
         )
+        # Generate token synchronously, then send email via Celery
+        from .email_service import generate_verification_token
+        token = generate_verification_token()
+        user.email_verification_token = token
+        user.save(update_fields=['email_verification_token'])
+        send_verification_email_task.delay(user.id)
         return user
 
     def validate_email(self, value):
@@ -47,17 +53,7 @@ class PasswordResetSerializer(serializers.Serializer):
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-        # In a real application, you would send an email with a link containing uid and token
-        # For now, we'll just print it to the console.
-        from django.conf import settings
-        reset_link = f"{settings.SITE_URL}/reset-password/{uid}/{token}/"
-        print(f"Password reset link for {user.email}: {reset_link}")
+        reset_link = f"{settings.SITE_URL}/#/reset-password/{uid}/{token}/"
 
-        # Example of sending email (requires email configuration in settings.py)
-        # send_mail(
-        #     'Password Reset Request',
-        #     f'Click the following link to reset your password: {reset_link}',
-        #     settings.DEFAULT_FROM_EMAIL,
-        #     [user.email],
-        #     fail_silently=False,
-        # )
+        # Send password reset email asynchronously via Celery
+        send_password_reset_email_task.delay(user.id, reset_link)

@@ -47,9 +47,9 @@ WSDL_ENDPOINTS = {
         'pickup': 'http://netconnect.bluedart.com/Demo/ShippingAPI/Pickup/PickupRegistrationService.svc?wsdl',
     },
     'production': {
-        'finder': 'https://netconnect.bluedart.com/Ver1.10/ShippingAPI/Finder/ServiceFinderQuery.svc?wsdl',
-        'waybill': 'https://netconnect.bluedart.com/Ver1.10/ShippingAPI/WayBill/WayBillGeneration.svc?wsdl',
-        'pickup': 'https://netconnect.bluedart.com/Ver1.10/ShippingAPI/Pickup/PickupRegistrationService.svc?wsdl',
+        'finder': 'https://netconnect.bluedart.com/Ver1.11/ShippingAPI/Finder/ServiceFinderQuery.svc?wsdl',
+        'waybill': 'https://netconnect.bluedart.com/Ver1.11/ShippingAPI/WayBill/WayBillGeneration.svc?wsdl',
+        'pickup': 'https://netconnect.bluedart.com/Ver1.11/ShippingAPI/Pickup/PickupRegistrationService.svc?wsdl',
     }
 }
 

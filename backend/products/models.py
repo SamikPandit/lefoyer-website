@@ -45,6 +45,8 @@ class Product(models.Model):
     image_8 = models.ImageField(upload_to='products/', blank=True, null=True)
     image_9 = models.ImageField(upload_to='products/', blank=True, null=True)
     image_10 = models.ImageField(upload_to='products/', blank=True, null=True)
+    amazon_link = models.URLField(max_length=500, blank=True, null=True, help_text="Optional Amazon product link")
+    manual_out_of_stock = models.BooleanField(default=False, help_text="Manually mark product as out of stock regardless of quantity")
     show_at_website = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -4,6 +4,7 @@ import ProductListing from './pages/ProductListing';
 import ProductDetail from './pages/ProductDetail';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
+import VerifyEmail from './pages/VerifyEmail';
 import Wishlist from './pages/Wishlist';
 import OrderConfirmation from './pages/OrderConfirmation';
 import About from './pages/About';
@@ -15,6 +16,7 @@ import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Profile from './pages/Profile';
 import OrderDetail from './pages/OrderDetail';
+import NotFound from './pages/NotFound';
 import Layout from './components/layout/Layout';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
@@ -64,6 +66,7 @@ function App() {
                 <Route path="/product/:slug" element={<ProductDetail />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<SignUp />} />
+                <Route path="/verify-email/:token" element={<VerifyEmail />} />
                 <Route path="/wishlist" element={
                   <ProtectedRoute>
                     <Wishlist />
@@ -95,7 +98,7 @@ function App() {
                     <OrderDetail />
                   </ProtectedRoute>
                 } />
-                <Route path="*" element={<div>Page not found</div>} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>
           </Router>

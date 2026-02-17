@@ -166,6 +166,15 @@ def poll_active_shipments():
                 if old_status != shipment.status:
                     logger.info(f"Shipment {shipment.awb_number} status changed: {old_status} -> {shipment.status}")
                     updated_count += 1
+                    
+                    # Send notification email for significant status changes
+                    notify_statuses = ['picked_up', 'in_transit', 'out_for_delivery', 'delivered']
+                    if shipment.status in notify_statuses:
+                        try:
+                            from accounts.tasks import send_shipment_update_email_task
+                            send_shipment_update_email_task.delay(shipment.order_id, shipment.status)
+                        except Exception as e:
+                            logger.warning(f"Failed to queue shipment update email: {e}")
             
             # Create/update tracking events
             for event_data in result['scan_events']:

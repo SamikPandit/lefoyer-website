@@ -25,11 +25,6 @@ export const AuthProvider = ({ children }) => {
       const response = await loginUser(credentials);
       const { access, refresh, user: userData } = response.data;
 
-      // If user data is not returned in login response, you might need to fetch it separately
-      // For now assuming backend returns it or we decode it from token if needed
-      // But standard JWT auth usually returns access/refresh. 
-      // Let's assume the backend serializer returns user data too or we use the username from credentials for now if not provided.
-
       const userToSave = userData || { username: credentials.username };
 
       setToken(access);
@@ -40,6 +35,14 @@ export const AuthProvider = ({ children }) => {
 
       return true;
     } catch (error) {
+      // Check for email not verified error
+      if (error.response && error.response.status === 403 && error.response.data && error.response.data.code === 'email_not_verified') {
+        return {
+          code: 'email_not_verified',
+          detail: error.response.data.detail,
+          email: error.response.data.email,
+        };
+      }
       console.error('Login failed:', error);
       return false;
     }

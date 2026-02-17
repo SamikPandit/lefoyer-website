@@ -43,8 +43,7 @@ const SignUp = () => {
         password: formData.password,
         phone_number: formData.phone_number,
       });
-      setSuccess('Registration successful! Please log in.');
-      setTimeout(() => navigate('/login'), 2000);
+      setSuccess('Registration successful! Please check your email to verify your account before logging in.');
     } catch (err) {
       if (err.response && err.response.data) {
         // Handle specific field errors
@@ -85,84 +84,97 @@ const SignUp = () => {
         </Typography>
         <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 3 }}>
           {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
-          {success && <Alert severity="success" sx={{ width: '100%', mb: 2 }}>{success}</Alert>}
-          <Grid container spacing={2}>
-            <Grid xs={12}>
-              <TextField
-                required
+          {success && (
+            <Alert severity="success" sx={{ width: '100%', mb: 2 }}>
+              {success}
+              <Box sx={{ mt: 1 }}>
+                <MuiLink component={RouterLink} to="/login" variant="body2" sx={{ fontWeight: 600 }}>
+                  Go to Sign In →
+                </MuiLink>
+              </Box>
+            </Alert>
+          )}
+          {!success && (
+            <>
+              <Grid container spacing={2}>
+                <Grid xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    id="email"
+                    label="Email Address"
+                    name="email"
+                    autoComplete="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                  />
+                </Grid>
+                <Grid xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    name="password"
+                    label="Password"
+                    type="password"
+                    id="password"
+                    autoComplete="new-password"
+                    value={formData.password}
+                    onChange={handleChange}
+                  />
+                </Grid>
+                <Grid xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    name="confirmPassword"
+                    label="Confirm Password"
+                    type="password"
+                    id="confirmPassword"
+                    autoComplete="new-password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                  />
+                </Grid>
+                <Grid xs={12}>
+                  <TextField
+                    fullWidth
+                    id="phone_number"
+                    label="Phone Number (Optional)"
+                    name="phone_number"
+                    autoComplete="tel"
+                    value={formData.phone_number}
+                    onChange={handleChange}
+                  />
+                </Grid>
+                <Grid xs={12}>
+                  <FormControlLabel
+                    control={<Checkbox name="agreeToTerms" checked={formData.agreeToTerms} onChange={handleChange} color="primary" />}
+                    label={
+                      <Typography variant="body2">
+                        I agree to the <MuiLink component={RouterLink} to="/terms" target="_blank">Terms & Conditions</MuiLink>
+                      </Typography>
+                    }
+                  />
+                </Grid>
+              </Grid>
+              <Button
+                type="submit"
                 fullWidth
-                id="email"
-                label="Email Address"
-                name="email"
-                autoComplete="email"
-                value={formData.email}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid xs={12}>
-              <TextField
-                required
-                fullWidth
-                name="password"
-                label="Password"
-                type="password"
-                id="password"
-                autoComplete="new-password"
-                value={formData.password}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid xs={12}>
-              <TextField
-                required
-                fullWidth
-                name="confirmPassword"
-                label="Confirm Password"
-                type="password"
-                id="confirmPassword"
-                autoComplete="new-password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid xs={12}>
-              <TextField
-                fullWidth
-                id="phone_number"
-                label="Phone Number (Optional)"
-                name="phone_number"
-                autoComplete="tel"
-                value={formData.phone_number}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid xs={12}>
-              <FormControlLabel
-                control={<Checkbox name="agreeToTerms" checked={formData.agreeToTerms} onChange={handleChange} color="primary" />}
-                label={
-                  <Typography variant="body2">
-                    I agree to the <MuiLink component={RouterLink} to="/terms" target="_blank">Terms & Conditions</MuiLink>
-                  </Typography>
-                }
-              />
-            </Grid>
-          </Grid>
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            disabled={loading}
-            sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '25px' }}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Sign Up'}
-          </Button>
-          <Grid container justifyContent="flex-end">
-            <Grid>
-              <MuiLink component={RouterLink} to="/login" variant="body2">
-                Already have an account? Sign in
-              </MuiLink>
-            </Grid>
-          </Grid>
+                variant="contained"
+                disabled={loading}
+                sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '25px' }}
+              >
+                {loading ? <CircularProgress size={24} /> : 'Sign Up'}
+              </Button>
+              <Grid container justifyContent="flex-end">
+                <Grid>
+                  <MuiLink component={RouterLink} to="/login" variant="body2">
+                    Already have an account? Sign in
+                  </MuiLink>
+                </Grid>
+              </Grid>
+            </>
+          )}
         </Box>
       </Box>
     </Container>
