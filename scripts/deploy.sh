@@ -84,10 +84,15 @@ say "2 · Rehearse the migration against a COPY of the live database"
 # local uid 1000 maps to `ubuntu` on this host. Without them the whole backend tree flips from
 # www-data to ubuntu and gunicorn can no longer create its unix socket — which takes the site
 # down at restart. '*.sock' is excluded because the live socket lives inside backend/ and
-# --delete would otherwise remove it out from under the running process.
+# --delete would otherwise remove it out from under the running process. 'celerybeat-schedule*'
+# is excluded for the same reason: celery beat's default --schedule path is relative to its
+# WorkingDirectory (this tree), so --delete used to wipe the scheduler's shelve db mid-run.
+# deploy/systemd/lefoyer-celery-beat.service moves it to /var/lib/celery; the exclude keeps
+# older installs from being broken by a deploy.
 rsync -az --delete --no-o --no-g --chown=www-data:www-data \
   --exclude venv --exclude .env --exclude db.sqlite3 --exclude media \
   --exclude staticfiles --exclude __pycache__ --exclude '*.pyc' --exclude '*.sock' \
+  --exclude 'celerybeat-schedule*' --exclude 'celerybeat.pid' \
   -e "ssh -o BatchMode=yes" \
   "$REPO_ROOT/backend/" "$SSH_HOST:$APP_ROOT/backend.incoming/"
 
@@ -130,7 +135,7 @@ rsh "set -e
   rm -rf backend.prev && cp -al backend backend.prev 2>/dev/null || cp -a backend backend.prev
   rsync -a --delete \
     --exclude venv --exclude .env --exclude db.sqlite3 --exclude media --exclude staticfiles \
-    --exclude '*.sock' \
+    --exclude '*.sock' --exclude 'celerybeat-schedule*' --exclude 'celerybeat.pid' \
     backend.incoming/ backend/
   rm -rf backend.incoming
   # Belt and braces: the service runs as www-data and must own everything it writes.
@@ -160,9 +165,27 @@ rsh "set -e
   rm -f $APP_ROOT/backend/lefoyer.sock
   systemctl restart lefoyer-backend
   systemctl restart lefoyer-celery || echo '    (celery restart skipped)'
+  # beat is restarted explicitly and its status is ASSERTED, not ignored. It was found dead in
+  # production having exhausted its restart budget on 2026-10-17, which silently stopped every
+  # periodic task — including sweep-pending-orders, the job that frees stock and coupon holds
+  # from abandoned prepaid orders. A scheduler that is down looks exactly like a site that is up.
+  systemctl restart lefoyer-celery-beat || echo '    (beat restart skipped)'
   nginx -t && systemctl reload nginx
-  sleep 4
+  sleep 5
   systemctl is-active lefoyer-backend"
+
+say "    unit status"
+for unit in lefoyer-backend lefoyer-celery lefoyer-celery-beat; do
+  st="$(rsh "systemctl is-active $unit" 2>/dev/null || true)"
+  if [[ "$st" == "active" ]]; then printf '    ok   %-28s %s\n' "$unit" "$st"
+  else
+    printf '\033[33m    !    %-28s %s\033[0m\n' "$unit" "${st:-unknown}"
+    if [[ "$unit" == "lefoyer-celery-beat" ]]; then
+      warn "beat is not running: periodic tasks (incl. the PENDING-order sweeper) will NOT fire."
+      warn "install deploy/systemd/lefoyer-celery-beat.service — see the header of that file."
+    fi
+  fi
+done
 
 # ---------------------------------------------------------------------------
 say "8 · Smoke test"
@@ -200,8 +223,8 @@ cat <<'NEXT'
 
     Still unverified — these need a real browser and real gateway credentials:
       · a PhonePe sandbox payment end to end (success, decline, abandon, replayed callback, retry)
-      · Blue Dart serviceability against the live WSDL (boolean coercion)
       · real email deliverability, and that verification links contain no /#/
-      · celerybeat is not installed as a service, so the PENDING-order sweeper will not run yet
+      · that celery beat stayed up after this deploy (step 7 prints its status; if it is not
+        'active' the PENDING-order sweeper is not running)
     See docs/DEPLOYMENT.md.
 NEXT

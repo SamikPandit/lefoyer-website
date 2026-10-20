@@ -11,14 +11,15 @@ Facts below were verified directly on the production host on 2026-10-20, not ass
 | Frontend | `/var/www/lefoyer/frontend/dist` served by nginx |
 | Backend | `/var/www/lefoyer/backend`, gunicorn via unix socket `backend/lefoyer.sock` |
 | Services | `lefoyer-backend.service` (running), `lefoyer-celery.service` (running), `redis-server` (running), nginx (running) |
-| Not running | **PostgreSQL — nothing listens on :5432.** `celerybeat` is **not** a running service. |
+| Services (cont.) | `lefoyer-celery-beat.service` **exists and is enabled, but was found `failed`** — see landmine 5. |
+| Not running | **PostgreSQL — nothing listens on :5432.** |
 | Node | v20.19.6 / npm 10.8.2 — the frontend *can* be built on the host |
 | nginx SPA rewrite | **Already present**: `try_files $uri $uri/ /index.html`. The `HashRouter` → `BrowserRouter` switch needs no nginx change. |
 
 nginx also proxies `/api/` and `/admin/` to the gunicorn socket and aliases `/static/` →
 `backend/staticfiles/`, `/media/` → `backend/media/`.
 
-## ⚠️ Four landmines — read before deploying
+## ⚠️ Five landmines — read before deploying
 
 ### 1. Production is running on SQLite, not Postgres
 
@@ -161,9 +162,72 @@ nginx -t && systemctl reload nginx
 # 6. smoke test — see below
 ```
 
-`celerybeat` is not currently a service. The new PENDING-payment sweeper is a beat task, so until a
-`lefoyer-celerybeat.service` exists it will not run and stale PENDING orders will not auto-expire.
-That is a known gap, not a silent one.
+Restart **beat as well** — `systemctl restart lefoyer-celery-beat` — and check that it is
+`active` afterwards. `scripts/deploy.sh` now does both and prints the status of all three units.
+See landmine 5 for why that check is not optional.
+
+### 5. Celery beat was dead, and the failure was invisible
+
+`lefoyer-celery-beat.service` does exist and is `enabled` — an earlier revision of this document
+said it did not, which was wrong. What was true is worse: it was **`failed`**, and had been since
+**2026-10-17**. Nothing in `CELERY_BEAT_SCHEDULE` had run for days: not `register-daily-pickup`, not
+`poll-active-shipments`, and not `sweep-pending-orders`, the job that releases stock and coupon holds
+from abandoned prepaid orders.
+
+It hid well, and it is worth knowing how:
+
+* `journalctl -u lefoyer-celery-beat` showed only the celery banner and `status=1/FAILURE`. **No
+  traceback** — because `--logfile=` redirects it. The cause was only ever written to
+  `/var/log/celery/beat.log`:
+
+  ```
+  PermissionError: [Errno 13] Permission denied: b'celerybeat-schedule.dat'
+  ```
+
+* `orders.tasks.sweep_pending_orders` appears in the *worker's* registered-task list, so the worker
+  looks perfectly healthy. The worker is not what fires periodic tasks.
+
+* With the default `RestartSec` (100 ms), `Restart=always` burns the 5-start budget in under a
+  second and systemd gives up permanently: *"Start request repeated too quickly."* A service that
+  has stopped retrying produces no further log lines at all.
+
+Two defects caused it, both fixed in `deploy/systemd/lefoyer-celery-beat.service`:
+
+1. **`--schedule` was omitted.** Celery's default path is *relative to `WorkingDirectory`*, which is
+   `/var/www/lefoyer/backend` — the deploy target. `deploy.sh` rsyncs that tree with `--delete`, so
+   a deploy wiped the scheduler's shelve db; and a leftover copy owned by a different user cannot be
+   opened at all, which is the `PermissionError` above. The unit now passes an absolute
+   `--schedule=/var/lib/celery/lefoyer-beat-schedule`, outside the deploy tree, and `deploy.sh`
+   excludes `celerybeat-schedule*` for the benefit of installs that have not been updated.
+2. **`HOME` was unset**, leaving a home directory `www-data` cannot write — the same class of fault
+   as the zeep WSDL cache that was returning 500s from the pincode endpoint (landmine 4).
+
+**To install the fix** (needs root on the host):
+
+```bash
+sudo install -m 644 deploy/systemd/lefoyer-celery-beat.service \
+     /etc/systemd/system/lefoyer-celery-beat.service
+sudo mkdir -p /var/lib/celery && sudo chown www-data:www-data /var/lib/celery
+sudo rm -f /var/www/lefoyer/backend/celerybeat-schedule.*
+sudo systemctl daemon-reload
+sudo systemctl reset-failed lefoyer-celery-beat     # clears the exhausted restart counter
+sudo systemctl enable --now lefoyer-celery-beat
+systemctl is-active lefoyer-celery-beat             # must print: active
+```
+
+`reset-failed` matters: without it systemd still considers the start budget spent and
+`restart` is a no-op.
+
+Then confirm it is actually scheduling, rather than merely running:
+
+```bash
+sudo tail -20 /var/log/celery/beat.log             # expect "Scheduler: Sending due task ..."
+journalctl -u lefoyer-celery | grep -i sweep_pending_orders | tail
+```
+
+**Monitor it.** The lesson here is not the permission bit, it is that a dead scheduler is
+indistinguishable from a healthy site from the outside. `systemctl is-active lefoyer-celery-beat`
+belongs in whatever alerting exists.
 
 ## Post-deploy smoke test
 
@@ -200,7 +264,7 @@ strength of local checks:
 1. A successful PhonePe sandbox payment end to end → `COMPLETED`, stock decremented **once**, cart
    cleared, one confirmation email, exactly one `Purchase` pixel event.
 2. A declined payment → `FAILED`, cart intact, no stock movement, no email, no pixel event.
-3. An abandoned payment → resolved to `CANCELLED`/`EXPIRED` by the sweeper (needs celerybeat, see above).
+3. An abandoned payment → resolved to `CANCELLED`/`EXPIRED` by the sweeper (needs beat *active* — landmine 5).
 4. A **replayed** callback → one email, one stock movement.
 5. A retry on a `FAILED` order → one order, a second `PaymentAttempt`.
 6. `validate_callback` accepting a genuine PhonePe callback with the dashboard username/password.

@@ -1,0 +1,60 @@
+# Le Foyer — Celery beat (the periodic-task scheduler).
+#
+# Install:
+#   sudo install -m 644 deploy/systemd/lefoyer-celery-beat.service \
+#        /etc/systemd/system/lefoyer-celery-beat.service
+#   sudo mkdir -p /var/lib/celery && sudo chown www-data:www-data /var/lib/celery
+#   sudo rm -f /var/www/lefoyer/backend/celerybeat-schedule.*
+#   sudo systemctl daemon-reload
+#   sudo systemctl reset-failed lefoyer-celery-beat
+#   sudo systemctl enable --now lefoyer-celery-beat
+#
+# Why this file exists in the repo at all: beat was found dead in production
+# (`systemctl is-active` → failed, restart counter exhausted, "Start request
+# repeated too quickly"). Nothing in CELERY_BEAT_SCHEDULE had run since
+# 2026-10-17 — including sweep-pending-orders, which is what releases stock and
+# coupons from abandoned prepaid orders. The failure was invisible in
+# `journalctl` because --logfile redirects the traceback into beat.log, where
+# the real cause was:
+#
+#     PermissionError: [Errno 13] Permission denied: b'celerybeat-schedule.dat'
+#
+# Two bugs produced that, and this unit fixes both.
+[Unit]
+Description=Le Foyer Celery Beat
+After=network.target redis.service
+# beat exits non-zero immediately if the broker's host is not up yet; without
+# this it burns its restart budget during a reboot and gives up for good.
+Requires=redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lefoyer/backend
+
+Environment="PATH=/var/www/lefoyer/backend/venv/bin"
+# Bug 1: HOME was unset, so it inherited a directory www-data cannot write.
+# Anything that falls back to ~/.cache then dies — this is the same class of
+# failure as the zeep WSDL cache that returned 500s from the pincode endpoint
+# (see docs/DEPLOYMENT.md). Give it a writable home of its own.
+Environment="HOME=/var/lib/celery"
+
+# Bug 2: --schedule was omitted, and celery's default is RELATIVE to
+# WorkingDirectory — i.e. the shelve db landed in /var/www/lefoyer/backend.
+# That directory is the deploy target, and deploy.sh rsyncs it with --delete,
+# so every deploy destroyed the schedule out from under the running scheduler.
+# Worse, a leftover copy owned by another user is unopenable and beat exits 1
+# on startup forever. An absolute path outside the deploy tree fixes it.
+ExecStart=/var/www/lefoyer/backend/venv/bin/celery -A lefoyer beat \
+  --loglevel=info \
+  --logfile=/var/log/celery/beat.log \
+  --schedule=/var/lib/celery/lefoyer-beat-schedule
+
+Restart=always
+# The default (100ms) empties the 5-start budget in half a second, which is how
+# this service reached "Start request repeated too quickly" and stayed dead.
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
