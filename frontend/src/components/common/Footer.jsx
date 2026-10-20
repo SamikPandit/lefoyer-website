@@ -1,215 +1,233 @@
-import React, { useState } from 'react';
-import { Box, Container, Grid, Typography, Link, TextField, Button, Stack, IconButton, Alert } from '@mui/material';
+/**
+ * Footer — rewritten. LF-06 (routing), LF-29 (FAQ/Contact reachable), LF-30 (copy from
+ * brand.js), IMPL_SPEC §1 C-15.
+ *
+ * FIVE DEFECTS THIS FILE USED TO CARRY, AND WHAT REPLACED THEM
+ *
+ * 1. EVERY LINK WAS DEAD. The SUPPORT column was the array
+ *    `['Shipping & Returns','Privacy Policy','Terms of Service']` run through a
+ *    ternary chain containing an `item === 'FAQ' ? '#/faq'` branch that no label could
+ *    ever reach, and ending `: '#'`. Worse, each one was a MUI `Link` pointing at a
+ *    legacy hash path rather than a `RouterLink` — so the day `App.jsx` became a
+ *    `BrowserRouter`, all of them broke. Links are now a declarative `[{label, to}]` array rendered with
+ *    `component={RouterLink} to=…`: no label can fall through to `'#'`, because there
+ *    is no fallback to fall through to. `href` + `target="_blank"` + `rel="noopener
+ *    noreferrer"` survives only on Instagram, which genuinely is external.
+ *
+ * 2. FAQ AND CONTACT WERE UNREACHABLE from the footer (LF-29). Both are now listed.
+ *
+ * 3. THE NEWSLETTER FORM WAS THEATRE. `if (email) setSubscribed(true)` — a single
+ *    space passed, nothing was ever sent anywhere, and the visitor was thanked for
+ *    subscribing to a list they were not on. Replaced by `<NewsletterForm
+ *    variant="inline" source="footer" />`, which posts to the real endpoint with the
+ *    consent text and reports what the server actually said.
+ *
+ * 4. A RED `severity="error"` ALERT OPENED THE FOOTER ON EVERY PAGE — including
+ *    directly beneath the payment step, where a red fraud warning reads as "something
+ *    just went wrong with your payment". The warning itself is legitimate and worth
+ *    keeping, so it is demoted to neutral small print in the legal row: same words,
+ *    no alarm, no `role="alert"`, no tinted band.
+ *
+ * 5. THE STATE EMBLEM OF INDIA WAS USED AS A DECORATIVE "MADE IN INDIA" BADGE. Its
+ *    use is restricted under the State Emblem of India (Prohibition of Improper Use)
+ *    Act, 2005, and this repository holds no authorisation for it. Replaced with a
+ *    typographic mark. `frontend/public/images/products/State_Emblem_of_India.png`
+ *    is now unreferenced and should be deleted from the repo (see the report's
+ *    cross-package requests — WP-08 owns no asset directory).
+ *
+ * Also: the wordmark/blurb/support details come from `content/brand.js` (LF-30 — the
+ * old "curating … natural beauty products" retailer framing is gone, along with the
+ * hand-uppercased second spelling of the brand name), the three legacy v1 Grid
+ * `item`/`xs`/`md` prop sets are migrated to MUI v7 `size={{…}}`, and the two
+ * hardcoded fonts and six hardcoded hex values are replaced by design tokens (§9.11).
+ */
+
+import { Box, Container, Divider, Grid, Link as MuiLink, Stack, Typography } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import InstagramIcon from '@mui/icons-material/Instagram';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+
+import { useBrand } from '../../content/brand';
+import NewsletterForm from './NewsletterForm';
+import { FOCUS_RING_SX } from './EmptyState';
+
+/**
+ * Internal destinations only, and every one of them is a route App.jsx declares.
+ * Adding a label here without a `to` is a type error waiting to happen rather than a
+ * silent `'#'`, which is the entire point of the shape.
+ */
+const SHOP_LINKS = Object.freeze([
+  { label: 'All products', to: '/products' },
+  { label: 'Search', to: '/search' },
+  { label: 'Your bag', to: '/cart' },
+  { label: 'Our story', to: '/about' },
+]);
+
+const SUPPORT_LINKS = Object.freeze([
+  { label: 'FAQ & delivery', to: '/faq' },
+  { label: 'Contact us', to: '/contact' },
+  { label: 'Shipping & Returns', to: '/shipping-returns' },
+  { label: 'Privacy Policy', to: '/privacy-policy' },
+  { label: 'Terms of Service', to: '/terms' },
+]);
+
+const LinkColumn = ({ title, links }) => (
+  <Box component="nav" aria-label={title}>
+    <Typography variant="overline" component="h2" sx={{ color: 'var(--lf-ink-3)', mb: 1.5 }}>
+      {title}
+    </Typography>
+    <Stack component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+      {links.map((link) => (
+        <Box component="li" key={link.to}>
+          <MuiLink
+            component={RouterLink}
+            to={link.to}
+            underline="none"
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              minHeight: 44,
+              color: 'var(--lf-ink-2)',
+              fontSize: '0.9375rem',
+              transition: 'color var(--lf-dur-2) var(--lf-ease)',
+              '@media (hover: hover)': {
+                '&:hover': { color: 'var(--lf-ink)', textDecoration: 'underline' },
+              },
+              ...FOCUS_RING_SX,
+            }}
+          >
+            {link.label}
+          </MuiLink>
+        </Box>
+      ))}
+    </Stack>
+  </Box>
+);
 
 const Footer = () => {
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
+  const brand = useBrand();
+  const year = new Date().getFullYear();
 
-  const handleSubscribe = (e) => {
-    e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail('');
-    }
-  };
   return (
     <Box
       component="footer"
       sx={{
-        bgcolor: '#FDFBF9',
-        pt: 0,
+        backgroundColor: 'var(--lf-canvas)',
+        borderTop: '1px solid var(--lf-hairline)',
+        pt: { xs: 6, md: 9 },
         pb: 4,
-        borderTop: '1px solid rgba(201, 169, 110, 0.1)'
       }}
     >
-      {/* Security Disclaimer Banner */}
-      <Box sx={{ bgcolor: '#FFE6E6', py: 2.5 }}>
-        <Container maxWidth="lg">
-          <Alert
-            icon={<WarningAmberIcon />}
-            severity="error"
-            sx={{
-              bgcolor: 'transparent',
-              border: 'none',
-              '& .MuiAlert-icon': {
-                color: '#D32F2F'
-              },
-              '& .MuiAlert-message': {
-                width: '100%'
-              }
-            }}
-          >
+      <Container maxWidth="lg">
+        <Grid container spacing={{ xs: 5, md: 8 }}>
+          {/* ---- brand ---- */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            {/* Fraunces use 3 of 3 (DESIGN_SYSTEM §2.2: nav wordmark, one home
+                interstitial, footer wordmark at 28px). */}
             <Typography
-              variant="body1"
-              sx={{
-                fontWeight: 600,
-                color: '#D32F2F',
-                textAlign: 'center',
-                fontSize: { xs: '0.875rem', sm: '1rem' }
-              }}
+              variant="wordmark"
+              component="p"
+              sx={{ fontSize: '1.75rem', color: 'var(--lf-ink)', mb: 2 }}
             >
-              Please be careful of fraudulent calls & SMSes! Le foyeR. Global will never call you with offers, free gifts, or ask you for payments through links.
+              {brand.wordmark}
             </Typography>
-          </Alert>
-        </Container>
-      </Box>
+            <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)', maxWidth: 420, mb: 2 }}>
+              {brand.positioningStatement}
+            </Typography>
 
-      <Container maxWidth="lg" sx={{ pt: 10 }}>
-        <Grid container spacing={8}>
-
-          {/* Column 1: Brand */}
-          <Grid item xs={12} md={5}>
-            <Typography
-              variant="h4"
-              sx={{
-                fontFamily: "'Cormorant Garamond', serif",
-                mb: 3,
-                letterSpacing: '0.05em'
-              }}
-            >
-              LE FOYER
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, lineHeight: 1.8 }}>
-              Curating the finest natural beauty products for your daily ritual.
-              We believe in the power of nature to rejuvenate and restore.
-            </Typography>
             <Stack direction="row" spacing={1} alignItems="center">
-              <IconButton
-                component="a"
-                href="https://instagram.com/lefoyerglobal"
+              <InstagramIcon fontSize="small" aria-hidden="true" sx={{ color: 'var(--lf-ink-3)' }} />
+              <MuiLink
+                href={brand.social.instagram}
                 target="_blank"
-                size="small"
-                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-              >
-                <InstagramIcon />
-              </IconButton>
-              <Link
-                href="https://instagram.com/lefoyerglobal"
-                target="_blank"
-                color="text.secondary"
+                rel="noopener noreferrer"
                 underline="hover"
-                variant="body2"
-                sx={{ '&:hover': { color: 'primary.main' } }}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  minHeight: 44,
+                  color: 'var(--lf-ink-2)',
+                  fontSize: '0.9375rem',
+                  '@media (hover: hover)': { '&:hover': { color: 'var(--lf-ink)' } },
+                  ...FOCUS_RING_SX,
+                }}
               >
-                @lefoyerglobal
-              </Link>
+                {brand.social.instagramHandle}
+                <Box component="span" className="lf-sr-only">
+                  {' '}
+                  (opens in a new tab)
+                </Box>
+              </MuiLink>
             </Stack>
           </Grid>
 
-          {/* Column 2: Support */}
-          <Grid item xs={12} md={2}>
-            <Typography variant="h6" sx={{ mb: 3, fontSize: '0.875rem' }}>
-              SUPPORT
-            </Typography>
-            <Stack spacing={2}>
-              {['Shipping & Returns', 'Privacy Policy', 'Terms of Service'].map((item) => (
-                <Link
-                  key={item}
-                  href={item === 'Privacy Policy' ? '#/privacy-policy' : item === 'Terms of Service' ? '#/terms' : item === 'Shipping & Returns' ? '#/shipping-returns' : item === 'FAQ' ? '#/faq' : '#'}
-                  color="text.secondary"
-                  underline="none"
-                  sx={{
-                    fontSize: '0.875rem',
-                    transition: 'color 0.2s',
-                    '&:hover': { color: 'primary.main' }
-                  }}
-                >
-                  {item}
-                </Link>
-              ))}
-            </Stack>
+          {/* ---- two link columns: 6/6 at 320px, so neither wraps to one word ---- */}
+          <Grid size={{ xs: 6, md: 2 }}>
+            <LinkColumn title="Shop" links={SHOP_LINKS} />
           </Grid>
 
-          {/* Column 3: Newsletter */}
-          <Grid item xs={12} md={5}>
-            <Typography variant="h6" sx={{ mb: 3, fontSize: '0.875rem' }}>
-              NEWSLETTER
+          <Grid size={{ xs: 6, md: 3 }}>
+            <LinkColumn title="Support" links={SUPPORT_LINKS} />
+          </Grid>
+
+          {/* ---- newsletter: the real form, the real endpoint, real consent ---- */}
+          <Grid size={{ xs: 12, md: 3 }}>
+            <Typography variant="overline" component="h2" sx={{ color: 'var(--lf-ink-3)', mb: 1.5 }}>
+              Newsletter
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Subscribe to receive updates, access to exclusive deals, and more.
-            </Typography>
-            {subscribed ? (
-              <Box sx={{ p: 2, bgcolor: 'rgba(201, 169, 110, 0.1)', borderRadius: 1 }}>
-                <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 600, mb: 1 }}>
-                  Thank you for subscribing!
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  You'll receive our latest updates and exclusive offers soon.
-                </Typography>
-              </Box>
-            ) : (
-              <Box component="form" noValidate autoComplete="off" onSubmit={handleSubscribe}>
-                <Stack direction="row" spacing={1}>
-                  <TextField
-                    placeholder="Your email address"
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 0,
-                        bgcolor: 'white',
-                        '& fieldset': { borderColor: '#E8E8E8' },
-                        '&:hover fieldset': { borderColor: '#C9A96E' },
-                      }
-                    }}
-                  />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disableElevation
-                    sx={{
-                      minWidth: '100px',
-                      bgcolor: 'primary.main',
-                      '&:hover': { bgcolor: 'primary.dark' }
-                    }}
-                  >
-                    JOIN
-                  </Button>
-                </Stack>
-              </Box>
-            )}
+            <NewsletterForm variant="inline" source="footer" />
           </Grid>
         </Grid>
 
-        {/* Made in India Section */}
-        <Box sx={{ mt: 8, mb: 4, textAlign: 'center' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-            <Box
-              component="img"
-              src="/images/products/State_Emblem_of_India.png"
-              alt="State Emblem of India"
-              sx={{
-                width: 150,
-                height: 'auto',
-                opacity: 0.7,
-                mb: 1
-              }}
-            />
-            <Typography
-              variant="caption"
-              sx={{
-                fontFamily: "'Cormorant Garamond', serif",
-                color: 'text.secondary',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                fontWeight: 600
-              }}
-            >
-              Exclusively made in India
-            </Typography>
-          </Box>
+        {/* ---- "Made in India": typographic, no emblem ---- */}
+        <Box
+          sx={{
+            mt: { xs: 6, md: 8 },
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 2,
+          }}
+        >
+          <Box sx={{ height: '1px', flex: '0 1 64px', backgroundColor: 'var(--lf-rule-gold)' }} />
+          <Typography variant="overline" component="p" sx={{ color: 'var(--lf-ink-3)' }}>
+            Made in India
+          </Typography>
+          <Box sx={{ height: '1px', flex: '0 1 64px', backgroundColor: 'var(--lf-rule-gold)' }} />
         </Box>
 
-        <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #E8E8E8', textAlign: 'center' }}>
-          <Typography variant="caption" color="text.secondary">
-            © {new Date().getFullYear()} Le foyeR. Global. All rights reserved.
+        <Divider sx={{ mt: 4, mb: 3 }} />
+
+        {/* ---- legal row ---- */}
+        <Stack spacing={1.5}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={{ xs: 1, sm: 2 }}
+            justifyContent="space-between"
+            alignItems={{ xs: 'flex-start', sm: 'center' }}
+          >
+            <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
+              © {year} {brand.legalName}. All rights reserved.
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
+              Questions?{' '}
+              <MuiLink
+                href={`mailto:${brand.support.email}`}
+                underline="always"
+                sx={{ color: 'var(--lf-gold-ink)', ...FOCUS_RING_SX }}
+              >
+                {brand.support.email}
+              </MuiLink>
+            </Typography>
+          </Stack>
+
+          {/* Demoted from a red severity="error" Alert on a pink band. Same words,
+              stated once, quietly — not shouted under the payment step. */}
+          <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)', maxWidth: 760 }}>
+            Security note: {brand.legalName} will never call you with offers or free
+            gifts, and will never ask you to make a payment through a link. If someone
+            does, please report it to {brand.support.email}.
           </Typography>
-        </Box>
+        </Stack>
       </Container>
     </Box>
   );

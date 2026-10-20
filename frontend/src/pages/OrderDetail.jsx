@@ -1,358 +1,488 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-    Container,
-    Box,
-    Typography,
-    Paper,
-    Grid,
-    Chip,
-    Button,
-    Divider,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    CircularProgress,
-    Alert,
-    Stack,
-} from '@mui/material';
-import {
-    ArrowBack,
-    Payment,
-    LocalShipping,
-    Receipt,
-} from '@mui/icons-material';
-import api from '../services/api';
+/**
+ * OrderDetail — one order, in full.
+ *
+ * WHAT WAS BROKEN (C-19, C-20, C-24 and the tracking bug)
+ *  - It read `order.status`, which **does not exist** on the model, so the
+ *    status chip printed the literal fallback 'Pending' for every order ever
+ *    placed. The serializer now derives `status` server-side and this page
+ *    consumes it.
+ *  - Eleven `order.shipping_*` reads rendered blank, because the old
+ *    `fields='__all__'` serializer emitted `first_name`/`city`/… without the
+ *    prefix. The serializer now sends both shapes; this page reads the flat
+ *    aliases with the nested block as a fallback.
+ *  - `const shipping = 0; // Add shipping logic if needed` and a client-side
+ *    `subtotal` recomputed from the lines are both gone: every figure is the
+ *    server's stored money (§2b #25), printed verbatim with no arithmetic.
+ *  - `order.discount` was an INTEGER PERCENT printed as `-₹{discount}` — so a
+ *    10% coupon displayed as "−₹10". It is now the rupee `discount_amount`.
+ *  - `navigate(order.shipment.tracking_url)` handed an absolute external Blue
+ *    Dart URL to react-router, which rendered the SPA's 404. It opens in a new
+ *    tab (`openTracking`).
+ */
+
+import { useCallback, useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Container from '@mui/material/Container';
+import Divider from '@mui/material/Divider';
+import Grid from '@mui/material/Grid';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Typography from '@mui/material/Typography';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
+import PaymentOutlinedIcon from '@mui/icons-material/PaymentOutlined';
+import ReplayIcon from '@mui/icons-material/Replay';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+
+import SeoHead from '../components/common/SeoHead';
+import SupportLink from '../components/common/SupportLink';
+import ErrorState from '../components/common/ErrorState';
+import { formatMoney } from '../components/cart/CartTotals';
 import OrderTimeline from '../components/order/OrderTimeline';
 import PaymentCompletionDialog from '../components/order/PaymentCompletionDialog';
+import {
+  formatOrderDate,
+  openTracking,
+  orderRef,
+  paymentChipColor,
+  statusChipColor,
+} from '../components/order/OrderCard';
+import { useCart } from '../context/CartContext';
+import { getApiErrorMessage, getOrder, restoreCartFromOrder } from '../services/api';
+import { usePolicy } from '../content/policy';
+
+const Panel = ({ title, children, sx, ...rest }) => (
+  <Box
+    // `sx` is MERGED, not spread after: `{...rest}` carrying an `sx` would
+    // replace the whole style object and silently drop the panel chrome.
+    sx={{
+      p: { xs: 2, md: 3 },
+      borderRadius: 'var(--lf-r-panel)',
+      border: '1px solid var(--lf-hairline)',
+      backgroundColor: 'var(--lf-surface)',
+      boxShadow: 'var(--lf-e-edge), var(--lf-e1)',
+      ...sx,
+    }}
+    {...rest}
+  >
+    {title && (
+      <Typography variant="h6" component="h2" sx={{ mb: 1.5 }}>
+        {title}
+      </Typography>
+    )}
+    {children}
+  </Box>
+);
+
+const KeyValue = ({ label, value, tone }) => (
+  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.4 }}>
+    <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
+      {label}
+    </Typography>
+    <Typography
+      variant="body2"
+      sx={{ color: tone || 'var(--lf-ink)', textAlign: 'right', wordBreak: 'break-word' }}
+    >
+      {value}
+    </Typography>
+  </Box>
+);
 
 const OrderDetail = () => {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
-    const [order, setOrder] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { refresh: refreshCart } = useCart();
+  const { copy } = usePolicy();
 
-    useEffect(() => {
-        window.scrollTo(0, 0);
-    }, []);
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [notice, setNotice] = useState(null);
 
-    useEffect(() => {
-        fetchOrderDetails();
-    }, [id]);
-
-    useEffect(() => {
-        if (searchParams.get('action') === 'payment' && order) {
-            setPaymentDialogOpen(true);
-        }
-    }, [searchParams, order]);
-
-    const fetchOrderDetails = async () => {
-        try {
-            const response = await api.get(`orders/${id}/`);
-            setOrder(response.data);
-        } catch (err) {
-            setError('Failed to load order details');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const getStatusColor = (status) => {
-        switch (status?.toLowerCase()) {
-            case 'delivered':
-                return 'success';
-            case 'shipped':
-            case 'out_for_delivery':
-                return 'info';
-            case 'processing':
-                return 'warning';
-            case 'cancelled':
-                return 'error';
-            default:
-                return 'default';
-        }
-    };
-
-    const getPaymentStatusColor = (paymentStatus) => {
-        switch (paymentStatus?.toUpperCase()) {
-            case 'COMPLETED':
-                return 'success';
-            case 'FAILED':
-                return 'error';
-            case 'PENDING':
-                return 'warning';
-            default:
-                return 'default';
-        }
-    };
-
-    if (loading) {
-        return (
-            <Box
-                sx={{
-                    minHeight: '60vh',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                }}
-            >
-                <CircularProgress />
-            </Box>
-        );
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getOrder(id);
+      setOrder(data);
+      setError(null);
+    } catch (requestError) {
+      setError(requestError);
+    } finally {
+      setLoading(false);
     }
+  }, [id]);
 
-    if (error || !order) {
-        return (
-            <Container maxWidth="lg" sx={{ py: 8 }}>
-                <Alert severity="error">{error || 'Order not found'}</Alert>
-                <Button startIcon={<ArrowBack />} onClick={() => navigate('/profile')} sx={{ mt: 2 }}>
-                    Back to Orders
-                </Button>
-            </Container>
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  /* `?action=payment` is how the list and the timeline deep-link into the retry
+     flow. It only OPENS a dialog — it can never change what the order says. */
+  useEffect(() => {
+    if (order && searchParams.get('action') === 'payment') setPaymentDialogOpen(true);
+  }, [order, searchParams]);
+
+  const handleRestoreCart = async () => {
+    setRestoring(true);
+    setNotice(null);
+    try {
+      const result = await restoreCartFromOrder(id);
+      await refreshCart();
+      const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
+      if (skipped.length > 0) {
+        setNotice(
+          `Your bag is back, except: ${skipped
+            .map((entry) => entry.name || `product ${entry.product_id}`)
+            .join(', ')} — no longer available.`
         );
+      }
+      navigate('/cart');
+    } catch (requestError) {
+      setNotice(getApiErrorMessage(requestError, 'We could not restore your bag.'));
+    } finally {
+      setRestoring(false);
     }
+  };
 
-    const subtotal = order.items?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
-    const shipping = 0; // Add shipping logic if needed
-    const discount = order.discount || 0;
-
+  if (loading && !order) {
     return (
-        <Container maxWidth="lg" sx={{ py: 8 }}>
-            {/* Header */}
-            <Box sx={{ mb: 4 }}>
-                <Button startIcon={<ArrowBack />} onClick={() => navigate('/profile')} sx={{ mb: 2 }}>
-                    Back to Orders
-                </Button>
-
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-                    <Box>
-                        <Typography variant="h4" gutterBottom>
-                            Order #{order.id}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            <Chip label={order.status || 'Pending'} color={getStatusColor(order.status)} />
-                            <Chip
-                                icon={<Payment />}
-                                label={order.payment_status || 'PENDING'}
-                                color={getPaymentStatusColor(order.payment_status)}
-                                variant="outlined"
-                            />
-                            <Chip label={order.payment_method || 'PREPAID'} variant="outlined" />
-                        </Box>
-                    </Box>
-
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                        {order.payment_status === 'PENDING' && (
-                            <Button
-                                variant="contained"
-                                color="warning"
-                                startIcon={<Payment />}
-                                onClick={() => setPaymentDialogOpen(true)}
-                            >
-                                Complete Payment
-                            </Button>
-                        )}
-                        {order.shipment?.tracking_url && (
-                            <Button
-                                variant="outlined"
-                                startIcon={<LocalShipping />}
-                                onClick={() => navigate(order.shipment.tracking_url)}
-                            >
-                                Track Shipment
-                            </Button>
-                        )}
-                    </Stack>
-                </Box>
-            </Box>
-
-            {/* Timeline */}
-            <Paper elevation={0} sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="h6" gutterBottom>
-                    Order Status
-                </Typography>
-                <OrderTimeline order={order} />
-            </Paper>
-
-            <Grid container spacing={3}>
-                {/* Items */}
-                <Grid item xs={12} md={8}>
-                    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider' }}>
-                        <Typography variant="h6" gutterBottom>
-                            Order Items
-                        </Typography>
-                        <TableContainer>
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Product</TableCell>
-                                        <TableCell align="center">Quantity</TableCell>
-                                        <TableCell align="right">Price</TableCell>
-                                        <TableCell align="right">Subtotal</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {order.items?.map((item) => (
-                                        <TableRow key={item.id}>
-                                            <TableCell>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                    <Box
-                                                        component="img"
-                                                        src={item.product_image || item.product?.image_main}
-                                                        alt={item.product_name || item.product?.name}
-                                                        sx={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 1 }}
-                                                    />
-                                                    <Typography variant="body2">
-                                                        {item.product_name || item.product?.name}
-                                                    </Typography>
-                                                </Box>
-                                            </TableCell>
-                                            <TableCell align="center">{item.quantity}</TableCell>
-                                            <TableCell align="right">₹{item.price}</TableCell>
-                                            <TableCell align="right">₹{item.price * item.quantity}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-
-                        <Divider sx={{ my: 2 }} />
-
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <Box sx={{ minWidth: 300 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                    <Typography variant="body2">Subtotal:</Typography>
-                                    <Typography variant="body2">₹{subtotal.toFixed(2)}</Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                    <Typography variant="body2">Shipping:</Typography>
-                                    <Typography variant="body2">₹{shipping.toFixed(2)}</Typography>
-                                </Box>
-                                {discount > 0 && (
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                        <Typography variant="body2" color="success.main">
-                                            Discount:
-                                        </Typography>
-                                        <Typography variant="body2" color="success.main">
-                                            -₹{discount.toFixed(2)}
-                                        </Typography>
-                                    </Box>
-                                )}
-                                <Divider sx={{ my: 1 }} />
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Typography variant="h6">Total:</Typography>
-                                    <Typography variant="h6">₹{order.total}</Typography>
-                                </Box>
-                            </Box>
-                        </Box>
-                    </Paper>
-                </Grid>
-
-                {/* Shipping & Payment Info */}
-                <Grid item xs={12} md={4}>
-                    <Stack spacing={3}>
-                        {/* Shipping Address */}
-                        <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider' }}>
-                            <Typography variant="h6" gutterBottom>
-                                Shipping Address
-                            </Typography>
-                            <Typography variant="body2">
-                                {order.shipping_first_name} {order.shipping_last_name}
-                            </Typography>
-                            <Typography variant="body2">{order.shipping_address}</Typography>
-                            <Typography variant="body2">
-                                {order.shipping_city}, {order.shipping_state} - {order.shipping_pincode}
-                            </Typography>
-                            <Typography variant="body2" sx={{ mt: 1 }}>
-                                Phone: {order.shipping_phone}
-                            </Typography>
-                            <Typography variant="body2">Email: {order.shipping_email}</Typography>
-                        </Paper>
-
-                        {/* Payment Info */}
-                        <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider' }}>
-                            <Typography variant="h6" gutterBottom>
-                                Payment Information
-                            </Typography>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                <Typography variant="body2" color="text.secondary">
-                                    Method:
-                                </Typography>
-                                <Chip label={order.payment_method || 'PREPAID'} size="small" />
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                <Typography variant="body2" color="text.secondary">
-                                    Status:
-                                </Typography>
-                                <Chip
-                                    label={order.payment_status || 'PENDING'}
-                                    color={getPaymentStatusColor(order.payment_status)}
-                                    size="small"
-                                />
-                            </Box>
-                            {order.payment_id && (
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Transaction ID:
-                                    </Typography>
-                                    <Typography variant="caption">{order.payment_id}</Typography>
-                                </Box>
-                            )}
-                        </Paper>
-
-                        {/* Shipment Info */}
-                        {order.shipment && (
-                            <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider' }}>
-                                <Typography variant="h6" gutterBottom>
-                                    Shipment Details
-                                </Typography>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        AWB Number:
-                                    </Typography>
-                                    <Typography variant="body2" fontWeight={600}>
-                                        {order.shipment.awb_number}
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Status:
-                                    </Typography>
-                                    <Chip label={order.shipment.status} size="small" color="info" />
-                                </Box>
-                                {order.shipment.tracking_url && (
-                                    <Button
-                                        variant="outlined"
-                                        size="small"
-                                        fullWidth
-                                        startIcon={<LocalShipping />}
-                                        onClick={() => navigate(order.shipment.tracking_url)}
-                                    >
-                                        Track Shipment
-                                    </Button>
-                                )}
-                            </Paper>
-                        )}
-                    </Stack>
-                </Grid>
-            </Grid>
-
-            {/* Payment Completion Dialog */}
-            <PaymentCompletionDialog
-                open={paymentDialogOpen}
-                onClose={() => setPaymentDialogOpen(false)}
-                order={order}
-                onSuccess={() => {
-                    fetchOrderDetails();
-                }}
-            />
-        </Container>
+      <Container maxWidth="lg" sx={{ py: 8 }}>
+        <SeoHead title="Your order" noindex />
+        <Stack spacing={2} alignItems="center">
+          <CircularProgress size={28} />
+          <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
+            Loading your order…
+          </Typography>
+        </Stack>
+      </Container>
     );
+  }
+
+  if (error || !order) {
+    return (
+      <Container maxWidth="sm" sx={{ py: 8 }}>
+        <SeoHead title="Your order" noindex />
+        <ErrorState
+          variant="page"
+          headingComponent="h1"
+          title={error?.isNotFound ? 'We could not find that order' : 'We could not load that order'}
+          error={error}
+          onRetry={error?.isNotFound ? null : load}
+          secondaryLabel="Go to my orders"
+          secondaryTo="/orders"
+        />
+      </Container>
+    );
+  }
+
+  const paymentStatus = String(order.payment_status || '').toUpperCase();
+  const address = order.shipping_address || {};
+  const line = (flat, nested) => order[flat] || address[nested] || '';
+  const items = Array.isArray(order.items) ? order.items : [];
+  const awaitingPayment = ['PENDING', 'FAILED'].includes(paymentStatus);
+  const canRetry = order.can_retry === true || (order.can_retry === undefined && awaitingPayment);
+  const shipment = order.shipment;
+
+  return (
+    <Container maxWidth="lg" sx={{ py: { xs: 4, md: 7 } }}>
+      <SeoHead title={`Order ${orderRef(order)}`} noindex description="Your order details." />
+
+      <Button
+        component={RouterLink}
+        to="/orders"
+        variant="text"
+        startIcon={<ArrowBackIcon fontSize="small" />}
+        sx={{ mb: 2 }}
+      >
+        All my orders
+      </Button>
+
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={2}
+        justifyContent="space-between"
+        alignItems={{ md: 'flex-start' }}
+        sx={{ mb: 3 }}
+      >
+        <Box>
+          <Typography variant="h3" component="h1" data-tnum="true">
+            Order {orderRef(order)}
+          </Typography>
+          {formatOrderDate(order.created_at) && (
+            <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)', mt: 0.5 }}>
+              Placed on {formatOrderDate(order.created_at)}
+            </Typography>
+          )}
+          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
+            <Chip label={order.status || 'Awaiting payment'} color={statusChipColor(order.status)} />
+            <Chip
+              variant="outlined"
+              icon={<PaymentOutlinedIcon />}
+              label={paymentStatus || 'PENDING'}
+              color={paymentChipColor(paymentStatus)}
+            />
+            <Chip
+              variant="outlined"
+              label={order.payment_method === 'COD' ? 'Cash on delivery' : 'Paid online'}
+            />
+          </Stack>
+        </Box>
+
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          {canRetry && (
+            <Button startIcon={<ReplayIcon />} onClick={() => setPaymentDialogOpen(true)}>
+              Complete payment
+            </Button>
+          )}
+          {shipment?.tracking_url && (
+            <Button
+              variant="outlined"
+              startIcon={<LocalShippingOutlinedIcon />}
+              onClick={() => openTracking(shipment.tracking_url)}
+            >
+              Track shipment
+            </Button>
+          )}
+        </Stack>
+      </Stack>
+
+      {notice && (
+        <Alert severity="info" sx={{ mb: 3 }} onClose={() => setNotice(null)}>
+          {notice}
+        </Alert>
+      )}
+
+      {order.needs_manual_review && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <AlertTitle>We are checking this order by hand</AlertTitle>
+          Your payment went through, but something about the stock for this order needs a human
+          look. We will contact you — there is nothing you need to do.{' '}
+          <SupportLink variant="inline" orderNumber={order.order_number} topic="order" label="Contact support" />
+        </Alert>
+      )}
+
+      <Panel sx={{ mb: 3 }} title="Order status">
+        <OrderTimeline
+          order={order}
+          onRetryPayment={canRetry ? () => setPaymentDialogOpen(true) : undefined}
+          onRestoreCart={awaitingPayment ? handleRestoreCart : undefined}
+        />
+        {awaitingPayment && (
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={handleRestoreCart}
+              disabled={restoring}
+              startIcon={restoring ? <CircularProgress size={16} /> : null}
+            >
+              Restore my cart
+            </Button>
+            <SupportLink variant="button" orderNumber={order.order_number} topic="order" />
+          </Stack>
+        )}
+      </Panel>
+
+      <Grid container spacing={3}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Panel title="Items">
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Product</TableCell>
+                    <TableCell align="center">Qty</TableCell>
+                    <TableCell align="right">Price</TableCell>
+                    <TableCell align="right">Line total</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Box
+                            component="img"
+                            src={item.product_image || ''}
+                            alt={item.product_name || ''}
+                            data-product="true"
+                            loading="lazy"
+                            sx={{
+                              width: 48,
+                              height: 48,
+                              objectFit: 'cover',
+                              borderRadius: 'var(--lf-r-chip)',
+                              backgroundColor: 'var(--lf-surface-sunken)',
+                            }}
+                          />
+                          <Box sx={{ minWidth: 0 }}>
+                            {item.product_slug ? (
+                              <Typography
+                                variant="body2"
+                                component={RouterLink}
+                                to={`/product/${item.product_slug}`}
+                                sx={{ color: 'var(--lf-ink)', textDecoration: 'none' }}
+                              >
+                                {item.product_name}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2">{item.product_name}</Typography>
+                            )}
+                            {item.product_sku && (
+                              <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)', display: 'block' }}>
+                                {item.product_sku}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="center" data-tnum="true">
+                        {item.quantity}
+                      </TableCell>
+                      <TableCell align="right" data-tnum="true">
+                        {formatMoney(item.price)}
+                      </TableCell>
+                      <TableCell align="right" data-tnum="true">
+                        {formatMoney(item.line_total)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <Divider sx={{ my: 2 }} />
+
+            {/* Every figure is the server's stored money, printed with no
+                arithmetic — the same numbers the confirmation email prints. */}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Box sx={{ width: { xs: '100%', sm: 320 } }}>
+                <KeyValue label="Subtotal" value={formatMoney(order.subtotal)} />
+                {Number(order.discount_amount) > 0 && (
+                  <KeyValue
+                    label={order.coupon_code ? `Discount (${order.coupon_code})` : 'Discount'}
+                    value={`−${formatMoney(order.discount_amount)}`}
+                    tone="var(--lf-ok-ink)"
+                  />
+                )}
+                <KeyValue
+                  label="Shipping"
+                  value={
+                    Number(order.shipping_amount) === 0
+                      ? 'Free'
+                      : formatMoney(order.shipping_amount, { fallback: copy.shippingAmountLabel })
+                  }
+                />
+                <Divider sx={{ my: 1 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="h6">Total</Typography>
+                  <Typography variant="price" data-tnum="true" sx={{ fontWeight: 700 }}>
+                    {formatMoney(order.total)}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Panel>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Stack spacing={3}>
+            <Panel title="Delivery address">
+              <Typography variant="body2">
+                {line('shipping_first_name', 'first_name')} {line('shipping_last_name', 'last_name')}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)' }}>
+                {line('shipping_address', 'address')}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)' }}>
+                {[line('shipping_city', 'city'), line('shipping_state', 'state')]
+                  .filter(Boolean)
+                  .join(', ')}
+                {line('shipping_pincode', 'pincode') ? ` — ${line('shipping_pincode', 'pincode')}` : ''}
+              </Typography>
+              <Divider sx={{ my: 1.5 }} />
+              {line('shipping_phone', 'phone') && (
+                <KeyValue label="Phone" value={line('shipping_phone', 'phone')} />
+              )}
+              {line('shipping_email', 'email') && (
+                <KeyValue label="Email" value={line('shipping_email', 'email')} />
+              )}
+            </Panel>
+
+            <Panel title="Payment">
+              <KeyValue
+                label="Method"
+                value={order.payment_method === 'COD' ? 'Cash on delivery' : 'Online (PhonePe)'}
+              />
+              <KeyValue label="State" value={paymentStatus || 'PENDING'} />
+              {order.payment_reference && (
+                <KeyValue label="Reference" value={order.payment_reference} />
+              )}
+              {order.payment_failure_reason && (
+                <KeyValue
+                  label="Last failure"
+                  value={order.payment_failure_reason}
+                  tone="var(--lf-err-ink)"
+                />
+              )}
+            </Panel>
+
+            {shipment && (
+              <Panel title="Shipment">
+                {shipment.awb_number && <KeyValue label="AWB" value={shipment.awb_number} />}
+                <KeyValue label="Status" value={shipment.status_display || shipment.status} />
+                {shipment.expected_delivery_date && (
+                  <KeyValue label="Expected" value={shipment.expected_delivery_date} />
+                )}
+                {shipment.tracking_url && (
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    sx={{ mt: 1.5 }}
+                    startIcon={<LocalShippingOutlinedIcon />}
+                    onClick={() => openTracking(shipment.tracking_url)}
+                  >
+                    Track with the courier
+                  </Button>
+                )}
+              </Panel>
+            )}
+
+            <Panel title="Need help?">
+              <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)', mb: 1.5 }}>
+                {copy.returnsLine}
+              </Typography>
+              <Stack spacing={1}>
+                <SupportLink variant="button" orderNumber={order.order_number} topic="order" />
+                <Button variant="text" component={RouterLink} to="/shipping-returns">
+                  Delivery &amp; returns policy
+                </Button>
+              </Stack>
+            </Panel>
+          </Stack>
+        </Grid>
+      </Grid>
+
+      <PaymentCompletionDialog
+        open={paymentDialogOpen}
+        onClose={() => setPaymentDialogOpen(false)}
+        order={order}
+        onSuccess={load}
+      />
+    </Container>
+  );
 };
 
 export default OrderDetail;

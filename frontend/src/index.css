@@ -1,88 +1,422 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap');
+/* ============================================================================
+   Le foyeR. — "Counter" design system
+   Single source of truth for design tokens. theme.js reads these by name.
+   Fonts are loaded in index.html via <link>. NEVER @import them here.
+   ========================================================================== */
 
+/* --- Fallback metric override: kills the font-swap layout shift ----------- */
+@font-face {
+  font-family: 'Inter-fallback';
+  src: local('Arial'), local('Helvetica'), local('Roboto');
+  size-adjust: 107%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+/* ============================================================================
+   1. TOKENS
+   Contrast ratios are measured against the surface named. Any token marked
+   NON-TEXT is forbidden as a text colour — it exists for fills and borders.
+   ========================================================================== */
 :root {
-  --color-gold-main: #C9A96E;
-  --color-gold-light: #E8D4B0;
-  --color-gold-dark: #9D7E4A;
-  --color-text-primary: #1A1A1A;
-  --color-text-secondary: #666666;
-  --color-bg-default: #FDFBF9;
-  --color-bg-paper: #FFFFFF;
+  color-scheme: only light;
+
+  /* --- Typeface stacks --- */
+  --lf-font-ui:      'Inter', 'Inter-fallback', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --lf-font-display: 'Inter Tight', 'Inter', 'Inter-fallback', system-ui, -apple-system, sans-serif;
+  --lf-font-brand:   'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+  /* --- Surfaces: warm, never neutral grey. #FAFAFA is banned sitewide. --- */
+  --lf-canvas:         #FDFBF9;  /* page background, EVERY page */
+  --lf-surface:        #FFFFFF;  /* cards, buy-box, panels, inputs */
+  --lf-surface-raised: #FFFDFB;  /* panel on a panel; the hero purchase card */
+  --lf-surface-sunken: #F6F2EC;  /* image mats, gallery frame, inert wells */
+  --lf-surface-quiet:  #F0ECE6;  /* disabled fills, skeleton base */
+  --lf-surface-glass:  rgba(253, 251, 249, 0.82); /* nav + sticky bars ONLY */
+  --lf-sheet-glass:    rgba(253, 251, 249, 0.92); /* drawers + overlays ONLY */
+  --lf-overlay:        rgba(20, 17, 15, 0.56);    /* modal / drawer scrim */
+  --lf-blur:           blur(20px) saturate(180%);
+
+  /* --- Ink tiers --- */
+  --lf-ink:    #14110F;  /* 18.4:1 canvas · 18.8:1 white — headings, body, PRICE */
+  --lf-ink-2:  #4A433C;  /*  9.42:1 canvas — long-form body, descriptions */
+  --lf-ink-3:  #6B635A;  /*  5.72:1 canvas · 5.29:1 sunken — captions, meta */
+  --lf-ink-4:  #8A8178;  /*  3.70:1 — NON-TEXT ONLY: field borders, disabled glyphs */
+  --lf-on-ink: #FFFFFF;  /* 18.8:1 on --lf-ink */
+
+  /* --- Gold, RETIERED. This is the brand-equity fix. --- */
+  --lf-gold:        #C9A96E;  /* 2.17:1 — NON-TEXT ONLY. Badge fills (ink label = 8.4:1),
+                                 hairline rules, stars on dark, wordmark on ink. */
+  --lf-gold-edge:   #A8803A;  /* 3.50:1 — NON-TEXT indicators: selected thumb border,
+                                 active tab underline, star fill on light, progress */
+  --lf-gold-ink:    #7A5A24;  /* 6.14:1 canvas · 6.33:1 white — gold AS TEXT: eyebrows,
+                                 tertiary links, "Notify me" */
+  --lf-gold-ink-hv: #6E4F1E;  /* 7.27:1 — hover/visited for the above */
+  --lf-gold-fill:   #8C6A24;  /* white label = 5.00:1 — the ONE gold solid button (Join) */
+  --lf-gold-tint:   #F7F0E2;  /* eyebrow/badge wash. ink on it = 15.9:1 */
+  --lf-gold-tint-2: #EFE4CE;  /* pressed state of the above */
+  --lf-rule-gold:   rgba(201, 169, 110, 0.42); /* THE section hairline under every h2 */
+
+  /* --- Borders --- */
+  --lf-hairline:      #E7E0D6;  /* default separator (decorative) */
+  --lf-border:        #DED6C9;  /* card hover border, table rules */
+  --lf-border-strong: #C9BFAE;  /* chip outlines, weighted dividers */
+  --lf-border-field:  #8A8178;  /* 3.70:1 — MANDATORY on input/checkbox/radio (SC 1.4.11) */
+  --lf-border-ink:    #14110F;  /* secondary button, selected tile */
+
+  /* --- Semantic --- */
+  --lf-ok-ink:    #15663D;  /* 6.78:1 — "In stock", "Save 19%", "Free delivery" */
+  --lf-ok:        #1E7A4D;  /* 5.16:1 — the 6px stock dot, check glyphs */
+  --lf-ok-tint:   #E7F4EC;  /* ok-ink on it = 6.18:1 */
+  --lf-warn-ink:  #7A4F00;  /* 6.91:1 — "Only 3 left", "Ships in 5-7 days" */
+  --lf-warn-tint: #FDF3E0;  /* warn-ink on it = 6.47:1 */
+  --lf-err-ink:   #A01C15;  /* 7.61:1 canvas · 7.86:1 white-on-it */
+  --lf-err-tint:  #FCECEA;  /* err-ink on it = 6.86:1 */
+
+  /* --- Focus --- */
+  --lf-focus:         #14110F;  /* 18.4:1 ring on every light surface */
+  --lf-focus-on-ink:  #E3C78C;  /* 11.5:1 ring inside .lf-ink-section */
+  --lf-focus-inner:   #FDFBF9;  /* the 1px separator that keeps the ring alive on ink fills */
+
+  /* --- Spacing: 4px scale for raw CSS. MUI spacing() stays at 8. --- */
+  --lf-1:4px;   --lf-2:8px;   --lf-3:12px;  --lf-4:16px;  --lf-5:20px;
+  --lf-6:24px;  --lf-8:32px;  --lf-10:40px; --lf-12:48px; --lf-16:64px;
+  --lf-20:80px; --lf-24:96px; --lf-30:120px;--lf-40:160px;
+
+  /* --- Radii: tiered by component class. shape.borderRadius = 14. --- */
+  --lf-r-chip:6px;    --lf-r-field:10px; --lf-r-card:14px;
+  --lf-r-panel:18px;  --lf-r-media:24px; --lf-r-pill:999px;
+
+  /* --- Elevation: warm-tinted rgba(20,17,15). Never neutral black. --- */
+  --lf-e0: none;
+  --lf-e1: 0 1px 2px rgba(20,17,15,0.05), 0 0 0 1px rgba(20,17,15,0.045);
+  --lf-e2: 0 2px 4px rgba(20,17,15,0.05), 0 8px 20px -6px rgba(20,17,15,0.09);
+  --lf-e3: 0 4px 8px rgba(20,17,15,0.06), 0 18px 36px -10px rgba(20,17,15,0.13);
+  --lf-e4: 0 8px 16px rgba(20,17,15,0.07), 0 36px 72px -18px rgba(20,17,15,0.19);
+  --lf-e-nav: 0 1px 0 rgba(20,17,15,0.07), 0 6px 20px -10px rgba(20,17,15,0.10);
+  --lf-e-bar: 0 -1px 0 rgba(20,17,15,0.08), 0 -10px 28px -10px rgba(20,17,15,0.11);
+  --lf-e-edge: inset 0 1px 0 rgba(255,255,255,0.72); /* the 1px top highlight */
+
+  /* --- Motion --- */
+  --lf-dur-1:110ms;  /* press, tick, badge bump */
+  --lf-dur-2:180ms;  /* colour, border, shadow, icon rotate, nav condense */
+  --lf-dur-3:260ms;  /* image crossfade, card raise, accordion, tab indicator */
+  --lf-dur-4:380ms;  /* overlay, drawer, modal, route transition */
+  --lf-ease:        cubic-bezier(0.22, 0.61, 0.36, 1);
+  --lf-ease-out:    cubic-bezier(0.16, 1.00, 0.30, 1);
+  --lf-ease-in:     cubic-bezier(0.40, 0.00, 1.00, 1.00);
+  --lf-ease-inout:  cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  --lf-ease-spring: cubic-bezier(0.34, 1.26, 0.64, 1);
+
+  /* --- Layout --- */
+  --lf-nav-h: 56px;
+  --lf-bar-h: 0px;          /* set to 68px by JS while a sticky bottom bar is mounted */
+  --lf-container: 1232px;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@media (min-width: 900px) { :root { --lf-nav-h: 64px; } }
+
+/* --- The inverted surface. Redeclares the SAME names, so every child
+       component works unchanged inside it with zero overrides. ------------- */
+.lf-ink-section {
+  --lf-canvas:#14110F; --lf-surface:#1C1917; --lf-surface-raised:#211E1B;
+  --lf-surface-sunken:#211E1B; --lf-surface-quiet:#262320;
+  --lf-ink:#F7F4F0;    /* 17.2:1 */
+  --lf-ink-2:#D3CBC2;  /* 11.0:1 */
+  --lf-ink-3:#A8A099;  /*  7.30:1 */
+  --lf-ink-4:#8F877E;  /*  5.33:1 */
+  --lf-on-ink:#14110F;
+  --lf-gold:#C9A96E;       /* 8.4:1 — legible as TEXT here, and only here */
+  --lf-gold-edge:#C9A96E;
+  --lf-gold-ink:#E3C78C;   /* 11.5:1 */
+  --lf-gold-ink-hv:#EFD9AC;
+  --lf-gold-fill:#DDBE84;
+  --lf-gold-tint:rgba(201,169,110,0.16);
+  --lf-gold-tint-2:rgba(201,169,110,0.24);
+  --lf-rule-gold:rgba(201,169,110,0.34);
+  --lf-hairline:rgba(247,244,240,0.12); --lf-border:rgba(247,244,240,0.18);
+  --lf-border-strong:rgba(247,244,240,0.28); --lf-border-field:rgba(247,244,240,0.46);
+  --lf-border-ink:#F7F4F0;
+  --lf-ok-ink:#5FCB93;  --lf-ok:#5FCB93;  --lf-ok-tint:rgba(95,203,147,0.14);
+  --lf-warn-ink:#EFBC6A; --lf-warn-tint:rgba(239,188,106,0.14);
+  --lf-err-ink:#F4A49F;  --lf-err-tint:rgba(244,164,159,0.14);
+  --lf-focus:var(--lf-focus-on-ink);
+  --lf-focus-inner:#14110F;
+  --lf-e-edge: inset 0 1px 0 rgba(255,255,255,0.08);
+  background: var(--lf-canvas);
+  color: var(--lf-ink);
+  color-scheme: dark;
 }
+
+/* --- Dark theme: SPECIFIED, NOT ENABLED. Do not wire a toggle until the
+       catalogue is re-shot on a dark set or image_main_dark exists. -------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { /* INTENTIONALLY EMPTY THIS RELEASE */ }
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --lf-canvas:#121110; --lf-surface:#1A1816; --lf-surface-raised:#211E1B;
+  --lf-surface-sunken:#211E1B; --lf-surface-quiet:#262320;
+  --lf-surface-glass:rgba(18,17,16,0.82); --lf-sheet-glass:rgba(18,17,16,0.94);
+  --lf-overlay:rgba(0,0,0,0.68);
+  --lf-ink:#F5F2EE; --lf-ink-2:#D3CBC2; --lf-ink-3:#A8A099; --lf-ink-4:#8F877E;
+  --lf-on-ink:#121110;
+  --lf-gold:#C9A96E; --lf-gold-edge:#C9A96E; --lf-gold-ink:#E3C78C;
+  --lf-gold-ink-hv:#EFD9AC; --lf-gold-fill:#DDBE84;
+  --lf-gold-tint:rgba(201,169,110,0.14); --lf-gold-tint-2:rgba(201,169,110,0.22);
+  --lf-rule-gold:rgba(201,169,110,0.34);
+  --lf-hairline:rgba(245,242,238,0.10); --lf-border:rgba(245,242,238,0.16);
+  --lf-border-strong:rgba(245,242,238,0.26); --lf-border-field:rgba(245,242,238,0.46);
+  --lf-border-ink:#F5F2EE;
+  --lf-ok-ink:#5FCB93; --lf-ok:#5FCB93; --lf-ok-tint:rgba(95,203,147,0.14);
+  --lf-warn-ink:#EFBC6A; --lf-warn-tint:rgba(239,188,106,0.14);
+  --lf-err-ink:#F4A49F; --lf-err-tint:rgba(244,164,159,0.14);
+  --lf-focus:#E3C78C; --lf-focus-inner:#121110;
+  --lf-e1:0 0 0 1px rgba(245,242,238,0.08);
+  --lf-e2:0 0 0 1px rgba(245,242,238,0.14), 0 8px 24px -8px rgba(0,0,0,0.6);
+  --lf-e3:0 0 0 1px rgba(245,242,238,0.16), 0 20px 48px -12px rgba(0,0,0,0.7);
+  --lf-e4:0 0 0 1px rgba(245,242,238,0.18), 0 40px 80px -20px rgba(0,0,0,0.8);
+  --lf-e-edge: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+html[data-theme="dark"] img[data-product] { background: #F5F2EE; }
+
+/* ============================================================================
+   2. RESET
+   ========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
 
 html {
-  scroll-behavior: smooth;
+  font-size: 100%;                 /* never a % reset — rem must track user prefs */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: clip;                /* NOT overflow:hidden on body — that kills sticky */
+  scroll-padding-top: calc(var(--lf-nav-h) + 16px);
 }
 
 body {
-  font-family: 'Inter', sans-serif;
-  background-color: var(--color-bg-default);
-  color: var(--color-text-primary);
+  font-family: var(--lf-font-ui);
+  font-size: 1rem;
+  line-height: 1.6;
+  background: var(--lf-canvas);
+  color: var(--lf-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 100dvh;
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
+body.lf-scroll-locked { position: fixed; inset: 0; width: 100%; overflow: hidden; }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+h1, h2, h3, h4 { font-family: var(--lf-font-display); text-wrap: balance; }
+h1, h2, h3 { overflow-wrap: anywhere; hyphens: none; }
+p  { text-wrap: pretty; }
+img, svg, video { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; touch-action: manipulation; }
+a { color: var(--lf-gold-ink); text-underline-offset: 3px; }
+a:hover { color: var(--lf-gold-ink-hv); }
+[hidden] { display: none !important; }
 
+/* ============================================================================
+   3. FOCUS — one ring, everywhere, no exceptions
+   ========================================================================== */
+*:focus-visible {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+*:focus:not(:focus-visible) { outline: none; }
+
+/* Inside a scroll container the ring must not be clipped */
+.lf-scroll *:focus-visible,
+[data-scroll-region] *:focus-visible { outline-offset: -2px; }
+
+/* On an ink fill or a gold fill: two-layer ring so it survives any backdrop */
+.lf-ring-inset:focus-visible,
+.MuiButton-containedPrimary.Mui-focusVisible,
+[data-on-fill]:focus-visible {
+  outline: 2px solid var(--lf-focus-inner);
+  outline-offset: -4px;
+  box-shadow: 0 0 0 2px var(--lf-focus-inner), 0 0 0 4px var(--lf-focus);
+}
+.lf-ink-section *:focus-visible { outline-color: var(--lf-focus-on-ink); }
+
+/* Skip link — the first focusable element on every page */
+.lf-skip-link {
+  position: fixed; top: -200px; left: 16px; z-index: 2000;
+  display: inline-flex; align-items: center; height: 44px; padding: 0 20px;
+  background: var(--lf-ink); color: var(--lf-on-ink);
+  font: 600 0.9375rem/1 var(--lf-font-ui);
+  border-radius: var(--lf-r-pill); text-decoration: none;
+  transition: top var(--lf-dur-2) var(--lf-ease-out);
+}
+.lf-skip-link:focus-visible { top: 8px; }
+
+/* ============================================================================
+   4. SELECTION + SCROLLBAR
+   ========================================================================== */
+::selection { background: var(--lf-gold-tint-2); color: var(--lf-ink); } /* was 1.9:1 */
+
+* { scrollbar-width: thin; scrollbar-color: var(--lf-border) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #E0E0E0;
-  border-radius: 4px;
+  background: var(--lf-border); border-radius: 999px;
+  border: 3px solid transparent; background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--lf-ink-3); background-clip: content-box; }
+.lf-rail::-webkit-scrollbar { height: 0; width: 0; }
+.lf-rail { scrollbar-width: none; }
+
+/* ============================================================================
+   5. UTILITIES
+   ========================================================================== */
+.lf-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.lf-rupee::before { content: "\20B9"; margin-right: 0.08em; }
+.lf-clamp-1,.lf-clamp-2,.lf-clamp-3,.lf-clamp-4,.lf-clamp-5 {
+  display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
+}
+.lf-clamp-1{-webkit-line-clamp:1}.lf-clamp-2{-webkit-line-clamp:2}
+.lf-clamp-3{-webkit-line-clamp:3}.lf-clamp-4{-webkit-line-clamp:4}
+.lf-clamp-5{-webkit-line-clamp:5}
+
+.lf-sr-only {
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-gold-main);
+/* THE section rule. One line of gold under every h2 on the site. */
+.lf-rule { height:1px; border:0; background: var(--lf-rule-gold); width:100%; }
+
+/* Image mat: every product image lives in one of these */
+.lf-media {
+  position: relative; overflow: hidden;
+  background: var(--lf-surface-sunken);
+  border-radius: var(--lf-r-field);
+  box-shadow: inset 0 0 0 1px var(--lf-hairline);
+}
+.lf-media > img { width:100%; height:100%; object-fit:cover; }
+.lf-media[data-fit="contain"] > img { object-fit: contain; padding: 8%; }
+.lf-ar-1x1 { aspect-ratio: 1 / 1; }
+.lf-ar-4x5 { aspect-ratio: 4 / 5; }
+.lf-ar-21x9 { aspect-ratio: 21 / 9; }
+
+/* Translucent chrome — nav and sticky bars only. Never inside a list. */
+.lf-glass {
+  background: var(--lf-surface-glass);
+  -webkit-backdrop-filter: var(--lf-blur);
+  backdrop-filter: var(--lf-blur);
+  box-shadow: var(--lf-e-edge);
+  isolation: isolate;           /* keeps the compositing layer stable */
+  transform: translateZ(0);
+}
+.lf-sheet-glass {
+  background: var(--lf-sheet-glass);
+  -webkit-backdrop-filter: var(--lf-blur);
+  backdrop-filter: var(--lf-blur);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lf-glass { background: #FDFBF9; }
+  .lf-sheet-glass { background: #FDFBF9; }
+  html[data-theme="dark"] .lf-glass,
+  html[data-theme="dark"] .lf-sheet-glass { background: #121110; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lf-glass, .lf-sheet-glass {
+    background: var(--lf-canvas);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
+/* Low-end Android gate. One attribute, set once at boot. No component knows. */
+html[data-glass="off"] .lf-glass,
+html[data-glass="off"] .lf-sheet-glass {
+  background: var(--lf-canvas);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 
-/* Selection */
-::selection {
-  background: var(--color-gold-main);
-  color: white;
+/* Scroll-snap rail */
+.lf-rail {
+  display: flex; gap: var(--lf-3);
+  overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory; scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-inline: var(--lf-4);
+}
+.lf-rail > * { scroll-snap-align: start; flex: 0 0 auto; }
+
+.lf-safe-bottom { padding-bottom: calc(var(--lf-4) + env(safe-area-inset-bottom, 0px)); }
+.lf-above-bar { bottom: calc(var(--lf-4) + var(--lf-bar-h) + env(safe-area-inset-bottom, 0px)); }
+
+/* The press gesture. Scale by surface size so nothing visibly distorts. */
+.lf-press       { transition: transform var(--lf-dur-1) var(--lf-ease); }
+.lf-press:active            { transform: scale(0.972); }  /* button, chip, icon */
+.lf-press[data-press="card"]:active { transform: scale(0.985); }
+.lf-press[data-press="row"]:active  { transform: scale(0.992); }
+.lf-press[data-press="panel"]:active{ transform: none; opacity: 0.94; } /* >320px */
+
+/* ============================================================================
+   6. SKELETONS
+   ========================================================================== */
+@keyframes lf-shimmer { from { transform: translate3d(-100%,0,0); } to { transform: translate3d(100%,0,0); } }
+@keyframes lf-pulse   { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+.lf-skel {
+  position: relative; overflow: hidden;
+  background: var(--lf-surface-quiet);
+  border-radius: var(--lf-r-chip);
+}
+.lf-skel--text { animation: lf-pulse 1400ms var(--lf-ease-inout) infinite; }
+.lf-skel--media::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg,
+    rgba(255,255,255,0) 20%,
+    rgba(255,255,255,0.62) 50%,
+    rgba(255,255,255,0) 80%);
+  animation: lf-shimmer 1400ms linear infinite;
+}
+html[data-glass="off"] .lf-skel--media::after { animation: none; content: none; }
+
+/* ============================================================================
+   7. REDUCED MOTION — behavioural, not just durational
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --lf-dur-1:1ms; --lf-dur-2:1ms; --lf-dur-3:1ms; --lf-dur-4:1ms;
+    --lf-ease-spring: var(--lf-ease);
+  }
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  html, .lf-rail { scroll-behavior: auto !important; }
+  .lf-skel--text  { animation: none; opacity: 1; }
+  .lf-skel--media::after { animation: none; content: none; }
+  .lf-press:active, .lf-press[data-press]:active { transform: none; }
+  /* Overlays and drawers appear in place rather than travelling */
+  [data-motion="enter"] { transform: none !important; }
 }
 
-/* Typography Utilities */
-.font-serif {
-  font-family: 'Cormorant Garamond', serif;
+/* ============================================================================
+   8. HIGH CONTRAST
+   ========================================================================== */
+@media (prefers-contrast: more) {
+  :root {
+    --lf-hairline: rgba(20,17,15,0.24);
+    --lf-border: rgba(20,17,15,0.34);
+    --lf-ink-3: #514A41;
+  }
+  *:focus-visible { outline-width: 3px; }
 }
 
-.font-sans {
-  font-family: 'Inter', sans-serif;
-}
-
-/* Glassmorphism Utilities */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.glass-header {
-  background: rgba(253, 251, 249, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(201, 169, 110, 0.1);
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.8s ease-out forwards;
+/* ============================================================================
+   9. HOVER GUARD — every hover style in the app lives inside this query.
+      A tap must never leave a control stuck in its hover state.
+   ========================================================================== */
+@media (hover: none) {
+  .lf-media > img { transform: none !important; }
 }

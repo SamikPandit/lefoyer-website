@@ -1,260 +1,205 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Box, Container, Typography, Card, CardContent, CardActionArea, IconButton } from '@mui/material';
+/**
+ * ShopByConcern — "Shop by concern", under the category grid.
+ *
+ * LF-24: like ProductCategories, this component was imported by Home.jsx and
+ * rendered nowhere. It now renders, from the live `listConcerns()` endpoint
+ * (§2a / §2b #7), and every card links to `/products?concern=<slug>`.
+ *
+ * NO INVENTED CONCERNS. Two of the six hardcoded cards named concern slugs that
+ * exist nowhere in the catalogue and only ever existed in that dead array;
+ * backend migration products/0008 derives Concern rows 1:1 from real
+ * sub-categories and keeps those two slugs on a refusal list. A concern is rendered only when
+ * `product_count > 0`, so a card can never land on an empty listing.
+ *
+ * DEAD CODE REMOVED: the `requestAnimationFrame` effect that computed a scroll
+ * offset and then returned without ever using it, the `scrollRef` it never
+ * attached, the `isPaused` state nothing ever set, and the 40s infinite
+ * auto-scroll (pausable on hover only — unusable on touch, WCAG 2.2.2). The
+ * grid is static; nothing moves, so nothing needs pausing.
+ *
+ * `icon_key` is a string key, mapped here. Backend 0008 seeds it equal to the
+ * concern slug; an unknown key falls back to a neutral glyph rather than
+ * breaking the row.
+ */
+
+import { useCallback, useEffect, useState } from 'react';
+
+import { Box, Card, CardActionArea, Container, Grid, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
-import WbSunnyOutlinedIcon from '@mui/icons-material/WbSunnyOutlined';
-import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
-import SpaOutlinedIcon from '@mui/icons-material/SpaOutlined';
+import ContentCutOutlinedIcon from '@mui/icons-material/ContentCutOutlined';
 import FaceRetouchingNaturalOutlinedIcon from '@mui/icons-material/FaceRetouchingNaturalOutlined';
-import NightsStayOutlinedIcon from '@mui/icons-material/NightsStayOutlined';
-import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
+import SpaOutlinedIcon from '@mui/icons-material/SpaOutlined';
+import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
+import WbSunnyOutlinedIcon from '@mui/icons-material/WbSunnyOutlined';
 
-const concerns = [
-  {
-    icon: <AutoAwesomeOutlinedIcon />,
-    title: 'Brightening',
-    description: 'Even tone & luminosity',
-    link: '/products?concern=brightening',
-    color: '#F5D5C8',
-  },
-  {
-    icon: <WaterDropOutlinedIcon />,
-    title: 'Hydration',
-    description: 'Deep moisture & plumpness',
-    link: '/products?concern=hydration',
-    color: '#B8C5B4',
-  },
-  {
-    icon: <FaceRetouchingNaturalOutlinedIcon />,
-    title: 'Anti-Aging',
-    description: 'Firm & rejuvenate',
-    link: '/products?concern=anti-aging',
-    color: '#E8DCE8',
-  },
-  {
-    icon: <SpaOutlinedIcon />,
-    title: 'Sensitive Skin',
-    description: 'Calm & soothe',
-    link: '/products?concern=sensitive',
-    color: '#F5E6E8',
-  },
-  {
-    icon: <WbSunnyOutlinedIcon />,
-    title: 'Sun Protection',
-    description: 'Shield & defend',
-    link: '/products?concern=sun-protection',
-    color: '#E8DCD3',
-  },
-  {
-    icon: <NightsStayOutlinedIcon />,
-    title: 'Night Repair',
-    description: 'Restore & renew',
-    link: '/products?concern=night-repair',
-    color: '#C9A96E',
-  },
-];
+import ErrorState from '../common/ErrorState';
+import { listConcerns } from '../../services/api';
 
-const ShopByConcern = () => {
-  const scrollRef = useRef(null);
-  const [isPaused, setIsPaused] = useState(false);
+/** icon_key -> glyph. Keys are the seeded concern slugs (products/0008). */
+const ICONS = {
+  cleansers: WaterDropOutlinedIcon,
+  'brightening-anti-pigmentation': AutoAwesomeOutlinedIcon,
+  'moisturizers-hydrators': SpaOutlinedIcon,
+  'sun-protection': WbSunnyOutlinedIcon,
+  'serums-treatments': ScienceOutlinedIcon,
+  'shampoo-conditioner': ContentCutOutlinedIcon,
+  'body-care': SpaOutlinedIcon,
+  'lip-care': FaceRetouchingNaturalOutlinedIcon,
+};
 
-  useEffect(() => {
-    const scrollContainer = scrollRef.current;
-    if (!scrollContainer) return;
+const SKELETON_CARDS = 4;
 
-    let scrollAmount = 0;
-    const speed = 1; // Pixels per frame
-    let animationId;
-
-    const scroll = () => {
-      if (!isPaused) {
-        scrollAmount += speed;
-        if (scrollAmount >= scrollContainer.scrollWidth / 2) {
-          scrollAmount = 0;
-          scrollContainer.scrollLeft = 0;
-        } else {
-          scrollContainer.scrollLeft = scrollAmount;
-        }
-      }
-      animationId = requestAnimationFrame(scroll);
-    };
-
-    // Clone children for infinite loop effect
-    // Note: For a true infinite loop with smooth scrolling, we need to duplicate the content
-    // However, for simplicity and robustness, we'll use a simpler auto-scroll interval or CSS animation
-    // Let's stick to a simpler auto-scroll interval for now which is easier to control
-
-    // Reset implementation for interval based scrolling which is more stable
-    return () => cancelAnimationFrame(animationId);
-  }, [isPaused]);
-
-  // Better approach: CSS Animation for smooth continuous scrolling
-  // We will duplicate the array to create a seamless loop
-  const duplicatedConcerns = [...concerns, ...concerns];
+const ConcernCard = ({ concern }) => {
+  const { name, slug, description, icon_key: iconKey } = concern;
+  const Icon = ICONS[iconKey] || ICONS[slug] || SpaOutlinedIcon;
 
   return (
-    <Box sx={{ py: { xs: 8, md: 10 }, backgroundColor: '#FAFAFA', overflow: 'hidden' }}>
-      <Container maxWidth="lg">
-        <Box sx={{ textAlign: 'center', mb: 6 }}>
-          <Typography
-            variant="caption"
-            component="p"
-            sx={{
-              color: 'primary.main',
-              mb: 2,
-              fontWeight: 600,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Personalized Solutions
-          </Typography>
-
-          <Typography
-            variant="h2"
-            component="h2"
-            gutterBottom
-            sx={{
-              color: 'text.primary',
-              mb: 2,
-            }}
-          >
-            Shop by Concern
-          </Typography>
-
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{
-              maxWidth: 650,
-              mx: 'auto',
-              mt: 2,
-            }}
-          >
-            Targeted treatments for your unique skincare needs
-          </Typography>
-        </Box>
-
-        {/* Carousel Container */}
+    <Card sx={{ height: '100%' }}>
+      <CardActionArea
+        component={Link}
+        to={`/products?concern=${encodeURIComponent(slug)}`}
+        className="lf-press"
+        data-press="card"
+        sx={{
+          height: '100%',
+          p: { xs: 2, md: 2.5 },
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          gap: 1.25,
+        }}
+      >
         <Box
+          aria-hidden="true"
           sx={{
-            position: 'relative',
-            width: '100%',
-            overflow: 'hidden',
-            '&::before, &::after': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              width: '100px',
-              height: '100%',
-              zIndex: 2,
-              pointerEvents: 'none',
-            },
-            '&::before': {
-              left: 0,
-              background: 'linear-gradient(to right, #FAFAFA, transparent)',
-            },
-            '&::after': {
-              right: 0,
-              background: 'linear-gradient(to left, #FAFAFA, transparent)',
-            },
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'var(--lf-gold-tint, #F7F0E2)',
+            color: 'var(--lf-gold-ink, #7A5A24)',
           }}
         >
-          <Box
-            sx={{
-              display: 'flex',
-              gap: 3,
-              width: 'max-content',
-              animation: 'scroll 40s linear infinite',
-              '&:hover': {
-                animationPlayState: 'paused',
-              },
-              '@keyframes scroll': {
-                '0%': { transform: 'translateX(0)' },
-                '100%': { transform: 'translateX(-50%)' },
-              },
-              py: 2, // Padding for hover effects
-            }}
-          >
-            {duplicatedConcerns.map((concern, index) => (
-              <Card
-                key={`${concern.title}-${index}`}
-                sx={{
-                  width: 220,
-                  flexShrink: 0,
-                  backgroundColor: 'white',
-                  borderRadius: 2,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    transform: 'translateY(-8px)',
-                    boxShadow: '0 12px 24px rgba(201, 169, 110, 0.2)',
-                    '& .concern-icon': {
-                      transform: 'scale(1.1)',
-                      backgroundColor: concern.color,
-                    },
-                  },
-                }}
-              >
-                <CardActionArea
-                  component={Link}
-                  to={concern.link}
-                  sx={{
-                    height: '100%',
-                    p: 3,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    textAlign: 'center',
-                  }}
-                >
-                  <Box
-                    className="concern-icon"
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      mb: 2,
-                      backgroundColor: concern.color,
-                      color: 'text.primary',
-                      transition: 'all 0.3s ease',
-                      '& svg': { fontSize: 28 },
-                    }}
-                  >
-                    {concern.icon}
-                  </Box>
-
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 500,
-                      mb: 0.5,
-                      fontSize: '1rem',
-                      color: 'text.primary',
-                    }}
-                  >
-                    {concern.title}
-                  </Typography>
-
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: 'text.secondary',
-                      fontSize: '0.75rem',
-                      letterSpacing: '0.02em',
-                    }}
-                  >
-                    {concern.description}
-                  </Typography>
-                </CardActionArea>
-              </Card>
-            ))}
-          </Box>
+          <Icon sx={{ fontSize: 24 }} />
         </Box>
+
+        <Typography variant="h5" component="h3" sx={{ color: 'var(--lf-ink, #14110F)' }}>
+          {name}
+        </Typography>
+
+        {description ? (
+          <Typography
+            variant="body2"
+            className="lf-clamp-2"
+            sx={{ color: 'var(--lf-ink-2, #4A433C)' }}
+          >
+            {description}
+          </Typography>
+        ) : null}
+      </CardActionArea>
+    </Card>
+  );
+};
+
+const ConcernSkeleton = () => (
+  <Box
+    aria-hidden="true"
+    sx={{
+      height: 168,
+      borderRadius: 'var(--lf-r-card, 14px)',
+      border: '1px solid var(--lf-hairline, #E7E0D6)',
+      backgroundColor: 'var(--lf-surface, #FFFFFF)',
+      p: 2.5,
+    }}
+  >
+    <Box className="lf-skel lf-skel--text" sx={{ width: 44, height: 44, borderRadius: '50%' }} />
+    <Box className="lf-skel lf-skel--text" sx={{ width: '70%', height: 14, mt: 2 }} />
+    <Box className="lf-skel lf-skel--text" sx={{ width: '90%', height: 12, mt: 1.25 }} />
+  </Box>
+);
+
+const ShopByConcern = () => {
+  /** 'loading' | 'error' | 'ready' */
+  const [status, setStatus] = useState('loading');
+  const [concerns, setConcerns] = useState([]);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(() => {
+    let alive = true;
+    setStatus('loading');
+    setError(null);
+
+    listConcerns()
+      .then(({ items }) => {
+        if (!alive) return;
+        setConcerns((items || []).filter((concern) => Number(concern.product_count) > 0));
+        setStatus('ready');
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setError(err);
+        setStatus('error');
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(load, [load]);
+
+  // No concern is backed by a sellable product: no section.
+  if (status === 'ready' && concerns.length === 0) return null;
+
+  return (
+    <Box
+      component="section"
+      aria-labelledby="home-concerns-heading"
+      sx={{ py: { xs: 5, md: 8 }, backgroundColor: 'var(--lf-surface, #FFFFFF)' }}
+    >
+      <Container>
+        <Box sx={{ mb: { xs: 3, md: 4 } }}>
+          <Typography variant="overline" component="p" sx={{ color: 'var(--lf-gold-ink, #7A5A24)' }}>
+            Shop by concern
+          </Typography>
+          <Typography
+            id="home-concerns-heading"
+            variant="h2"
+            component="h2"
+            sx={{ color: 'var(--lf-ink, #14110F)', mt: 0.5, mb: 1.5 }}
+          >
+            What are you looking after?
+          </Typography>
+          <Box className="lf-rule" component="hr" sx={{ maxWidth: 160 }} />
+        </Box>
+
+        {status === 'error' ? (
+          <ErrorState
+            title="We could not load these groups"
+            error={error}
+            onRetry={load}
+            secondaryLabel="Browse all products"
+            secondaryTo="/products"
+          />
+        ) : (
+          <Grid container spacing={2} aria-busy={status === 'loading'}>
+            {status === 'loading'
+              ? Array.from({ length: SKELETON_CARDS }).map((_, index) => (
+                  <Grid key={`concern-skeleton-${index}`} size={{ xs: 12, sm: 6, md: 3 }}>
+                    <ConcernSkeleton />
+                  </Grid>
+                ))
+              : concerns.map((concern) => (
+                  <Grid key={concern.id ?? concern.slug} size={{ xs: 12, sm: 6, md: 3 }}>
+                    <ConcernCard concern={concern} />
+                  </Grid>
+                ))}
+          </Grid>
+        )}
       </Container>
     </Box>
   );

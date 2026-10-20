@@ -2,9 +2,9 @@
 Celery tasks for Blue Dart shipping automation
 """
 import logging
-from datetime import datetime, timedelta
 from celery import shared_task
 from django.utils import timezone
+from django.conf import settings
 from django.core.files.base import ContentFile
 
 from .models import Shipment, TrackingEvent
@@ -13,108 +13,157 @@ from orders.models import Order
 
 logger = logging.getLogger(__name__)
 
+#: Until product weights exist in the catalogue there is one declared weight for
+#: every parcel. Named rather than repeated as a bare 0.5 in four places.
+DEFAULT_WEIGHT_KG = 0.5
+
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def generate_shipment_for_order(self, order_id):
+    """Generate the Blue Dart waybill and label for a confirmed order.
+
+    Called from ``orders.services.confirm_order`` via
+    ``transaction.on_commit`` - not from a ``post_save`` signal. See
+    ``shipping/signals.py`` for why the signal had to go.
+
+    Two things are fixed here beyond the dispatch point.
+
+    **The shipment row is obtained with ``get_or_create``**, so a duplicated
+    dispatch (a retried Celery delivery, an operator re-running it) cannot
+    create a second shipment for one order.
+
+    **A transient waybill failure is distinguished from "a shipment already
+    exists".** The old version, on a Blue Dart error, created a Shipment row
+    with ``status='pending'`` and the error message - and then retried. The
+    retry found ``hasattr(order, 'shipment')`` true, logged "Shipment already
+    exists" and returned. So the very row written to record the failure was what
+    stopped the failure from ever being retried, permanently. Now the test is
+    whether an **AWB number** exists: no AWB means the booking never succeeded
+    and is still retry-worthy.
     """
-    Generate Blue Dart shipment (AWB and label) for a completed order.
-    
-    Triggered automatically when order payment is completed.
-    Retry strategy: 3 retries with 5 minute delays on failure.
-    
-    Args:
-        order_id: ID of the Order to create shipment for
-    """
+    logger.info(f"Starting shipment generation for order #{order_id}")
+
     try:
-        logger.info(f"Starting shipment generation for order #{order_id}")
-        
-        # Get the order
-        try:
-            order = Order.objects.get(id=order_id)
-        except Order.DoesNotExist:
-            logger.error(f"Order #{order_id} not found")
-            return
-        
-        # Check if shipment already exists
-        if hasattr(order, 'shipment'):
-            logger.warning(f"Shipment already exists for order #{order_id}: AWB {order.shipment.awb_number}")
-            return
-        
-        # Check if order is paid or COD
-        is_cod = getattr(order, 'payment_method', 'PREPAID') == 'COD'
-        
-        if not is_cod and order.payment_status != 'COMPLETED':
-            logger.warning(f"Order #{order_id} is not paid yet (status: {order.payment_status}) and is not COD")
-            return
-        
-        # Initialize Blue Dart client
+        order = Order.objects.get(id=order_id)
+    except Order.DoesNotExist:
+        logger.error(f"Order #{order_id} not found")
+        return {'status': 'order_missing', 'order_id': order_id}
+
+    is_cod = getattr(order, 'payment_method', 'PREPAID') == 'COD'
+    if not is_cod and order.payment_status != 'COMPLETED':
+        logger.warning(
+            f"Order #{order_id} is not paid (status: {order.payment_status}) and is "
+            f"not COD; not booking a shipment."
+        )
+        return {'status': 'not_payable', 'order_id': order_id}
+
+    if getattr(order, 'needs_manual_review', False):
+        # confirm_order found short stock on a paid order. Booking a courier for
+        # goods that may not exist is worse than waiting for a human.
+        logger.error(
+            f"Order #{order_id} is flagged for manual review; not booking a shipment."
+        )
+        return {'status': 'needs_manual_review', 'order_id': order_id}
+
+    sub_product_code = 'C' if is_cod else 'P'
+    collectible_amount = order.total if is_cod else 0
+
+    shipment, created = Shipment.objects.get_or_create(
+        order=order,
+        defaults={
+            'destination_pincode': order.pincode,
+            'origin_area': getattr(settings, 'BLUEDART_ORIGIN_AREA', '') or 'BOM',
+            'weight_kg': DEFAULT_WEIGHT_KG,
+            'declared_value': order.total,
+            'collectible_amount': collectible_amount,
+            'sub_product_code': sub_product_code,
+            'status': 'pending',
+        },
+    )
+
+    # An AWB - not the mere existence of a row - is what means "booked".
+    if shipment.awb_number:
+        logger.info(
+            f"Shipment already booked for order #{order_id}: AWB {shipment.awb_number}"
+        )
+        return {
+            'status': 'already_booked',
+            'order_id': order_id,
+            'awb_number': shipment.awb_number,
+        }
+
+    if not created:
+        logger.info(
+            f"Retrying waybill generation for order #{order_id} "
+            f"(existing shipment row has no AWB; last error: {shipment.last_error!r})"
+        )
+
+    try:
         client = BlueDartClient()
-        
-        # Set COD parameters
-        sub_product_code = 'C' if is_cod else 'P'
-        collectible_amount = order.total if is_cod else 0
-        
-        # Generate waybill
         result = client.generate_waybill(
             order=order,
             sub_product_code=sub_product_code,
-            # Uses default weight/dimensions from settings for now
-            # TODO: Calculate actual weight from order items if product weights are available
         )
-        
-        if result['error']:
-            logger.error(f"Waybill generation failed for order #{order_id}: {result['error']}")
-            # Create shipment with error status for tracking
-            Shipment.objects.create(
-                order=order,
-                destination_pincode=order.pincode,
-                origin_area='BOM', # Fallback or fetch from client
-                weight_kg=0.5,
-                declared_value=order.total,
-                collectible_amount=collectible_amount,
-                sub_product_code=sub_product_code,
-                status='pending',
-                last_error=result['error']
-            )
-            # Retry the task
-            raise self.retry(exc=BlueDartAPIError(result['error']))
-        
-        # Create shipment record
-        shipment = Shipment.objects.create(
-            order=order,
-            awb_number=result['awb_number'],
-            destination_area=result['destination_area'],
-            destination_pincode=order.pincode,
-            origin_area=client.origin_area,
-            weight_kg=0.5,  # TODO: Calculate from order items
-            declared_value=order.total,
-            collectible_amount=collectible_amount,
-            sub_product_code=sub_product_code,
-            status='booked',
+    except Exception as exc:
+        # Reaching Blue Dart failed outright. Record it on the row we already
+        # have and retry - the row is not evidence of success.
+        shipment.last_error = str(exc)[:2000]
+        shipment.status = 'pending'
+        shipment.save(update_fields=['last_error', 'status', 'updated_at'])
+        logger.error(f"Waybill call raised for order #{order_id}: {exc}")
+        raise self.retry(exc=exc)
+
+    if result['error']:
+        shipment.last_error = str(result['error'])[:2000]
+        shipment.status = 'pending'
+        shipment.collectible_amount = collectible_amount
+        shipment.sub_product_code = sub_product_code
+        shipment.declared_value = order.total
+        shipment.destination_pincode = order.pincode
+        shipment.save()
+        logger.error(
+            f"Waybill generation failed for order #{order_id}: {result['error']} "
+            f"- shipment row kept with no AWB so this stays retry-worthy."
         )
-        
-        # Save label PDF if available
-        if result['label_pdf_bytes']:
-            shipment.label_pdf.save(
-                f"label_{result['awb_number']}.pdf",
-                ContentFile(result['label_pdf_bytes']),
-                save=True
-            )
-        
-        # Get expected delivery date
-        try:
-            transit_result = client.get_transit_time(order.pincode)
-            if transit_result['expected_delivery_date']:
-                shipment.expected_delivery_date = transit_result['expected_delivery_date']
-                shipment.save()
-        except Exception as e:
-            logger.warning(f"Failed to get transit time for order #{order_id}: {e}")
-        
-        logger.info(f"Shipment created successfully for order #{order_id}: AWB {result['awb_number']}")
-        
-    except Exception as e:
-        logger.error(f"Unexpected error generating shipment for order #{order_id}: {e}")
-        raise self.retry(exc=e)
+        raise self.retry(exc=BlueDartAPIError(result['error']))
+
+    shipment.awb_number = result['awb_number']
+    shipment.destination_area = result['destination_area']
+    shipment.destination_pincode = order.pincode
+    shipment.origin_area = client.origin_area
+    shipment.weight_kg = DEFAULT_WEIGHT_KG
+    shipment.declared_value = order.total
+    shipment.collectible_amount = collectible_amount
+    shipment.sub_product_code = sub_product_code
+    shipment.status = 'booked'
+    shipment.last_error = None
+    shipment.save()
+
+    if result['label_pdf_bytes']:
+        shipment.label_pdf.save(
+            f"label_{result['awb_number']}.pdf",
+            ContentFile(result['label_pdf_bytes']),
+            save=True,
+        )
+
+    try:
+        transit_result = client.get_transit_time(order.pincode)
+        if transit_result['expected_delivery_date']:
+            shipment.expected_delivery_date = transit_result['expected_delivery_date']
+            shipment.save(update_fields=['expected_delivery_date', 'updated_at'])
+    except Exception as exc:
+        # Cosmetic. An absent ETA must not undo a successful booking, and must
+        # not trigger a retry that would try to book a second waybill.
+        logger.warning(f"Failed to get transit time for order #{order_id}: {exc}")
+
+    logger.info(
+        f"Shipment created for order #{order_id}: AWB {result['awb_number']}"
+    )
+    return {
+        'status': 'booked',
+        'order_id': order_id,
+        'awb_number': result['awb_number'],
+    }
 
 
 @shared_task

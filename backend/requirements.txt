@@ -1,3 +1,44 @@
+# ============================================================================
+# Le foyeR. backend requirements
+# ============================================================================
+#
+# WARNING: THIS FILE IS A `pip freeze` OF A DEVELOPER'S WHOLE MACHINE.
+#
+# It is 220+ lines and most of them have nothing to do with this Django
+# project. It is left as-is on purpose: curating it wholesale, untested, is the
+# fastest way to break a production deploy, and the server's current virtualenv
+# was built from exactly this list. Do not "tidy" it as a side effect of
+# another change.
+#
+# Packages this project actually imports (verified by grep over backend/):
+#   Django, djangorestframework, djangorestframework-simplejwt,
+#   django-filter, drf-nested-routers, django-cors-headers, django-jazzmin,
+#   django-summernote, django-celery-beat, celery, redis, zeep, xmltodict,
+#   Pillow, python-dotenv, dj-database-url, gunicorn, psycopg2-binary,
+#   and phonepe-sdk (see the note at the bottom of this file).
+#
+# CLEANUP CANDIDATES — unrelated to this project, present only because the
+# freeze captured the whole environment. Each one should be confirmed absent
+# from the import graph and then dropped, in a SEPARATE, SEPARATELY-DEPLOYED
+# change with the server rebuilt from scratch and smoke-tested:
+#   - LLM / RAG stack: langchain, langchain-community, langchain-core,
+#     langchain-openai, langchain-text-splitters, langsmith, openai, chromadb,
+#     tiktoken, tokenizers, huggingface-hub, onnxruntime
+#   - a second, unused web framework: Flask, Flask-Compress, Flask-Cors,
+#     Flask-JWT-Extended, Flask-Login, Flask-Migrate, Flask-RESTful,
+#     Flask-SQLAlchemy, SQLAlchemy, alembic, fastapi, uvicorn
+#   - reverse-engineering / security tooling: capstone, keystone-engine,
+#     paramiko, scapy-adjacent Twisted/autobahn
+#   - data-science weight: numpy, pandas, pypdf, protobuf, grpcio, google-auth
+# Dropping these is expected to remove hundreds of megabytes from the image.
+# It is NOT part of the current change-set.
+#
+# Note also that several lines below carry no version at all (`archspec`,
+# `boltons`, `requests`, `zstandard`) because the freeze ran inside a conda
+# environment. There is no lockfile. Both facts make a from-scratch rebuild
+# non-reproducible today.
+# ============================================================================
+
 aiohappyeyeballs==2.6.1
 aiohttp==3.12.15
 aiosignal==1.4.0
@@ -218,7 +259,53 @@ zipp==3.23.0
 zope.event==5.0
 zope.interface==7.2
 zstandard 
-phonepe-sdk
+
+# ============================================================================
+# Project dependencies added by hand (not from the freeze)
+# ============================================================================
+# These are deliberately left UNVERSIONED, exactly as they already were. The
+# versions the production server resolved them to are not knowable from this
+# repository (there is no lockfile and the freeze above omitted them), and
+# writing a guessed pin here would be worse than no pin: it would silently
+# downgrade or upgrade a working server on the next rebuild.
+# TODO(ops): run `pip freeze | grep -iE 'django-filter|drf-nested-routers|
+# Pillow|dj-database-url'` ON THE SERVER and replace these four lines with the
+# exact versions it reports.
 django-filter
 drf-nested-routers
 Pillow
+
+# Required by lefoyer/settings.py to parse DATABASE_URL. Without it the
+# settings module raises ImproperlyConfigured when DATABASE_URL is set, which
+# is every non-debug environment. It was missing from this file entirely while
+# settings.py imported it inside a try/except that silently fell back to
+# SQLite - i.e. production could run on the bundled SQLite file because of one
+# absent line here.
+dj-database-url
+
+# ----------------------------------------------------------------------------
+# phonepe-sdk — NOT PINNED, AND IT CANNOT BE INSTALLED FROM HERE.
+# ----------------------------------------------------------------------------
+# VERIFIED IN THIS ENVIRONMENT: `pip install phonepe-sdk` fails with
+#   ERROR: Could not find a version that satisfies the requirement phonepe-sdk
+#   ERROR: No matching distribution found for phonepe-sdk
+# The package is NOT published on public PyPI. It must be obtained from
+# PhonePe's own distribution (their developer portal / the wheel or git URL
+# they supply to a registered merchant) and installed separately, e.g.
+#   pip install <url-or-path-to-the-wheel-PhonePe-gave-us>
+#
+# Consequences, stated plainly rather than hidden behind a bare requirement
+# line:
+#   * This bare, unversioned line cannot resolve. Any `pip install -r` of this
+#     file on a clean machine FAILS at this line.
+#   * The exact V2 method names on StandardCheckoutClient therefore cannot be
+#     introspected locally. The payment code must discover them at runtime and
+#     must not hardcode a guess (see backend/orders/payment.py).
+#   * The production server already has a working copy installed; that is the
+#     only reason the current deploy functions.
+#
+# TODO(business): obtain the SDK artefact and its version from PhonePe, record
+# the version here as `phonepe-sdk==<version>` together with the index URL or
+# wheel location it came from, and confirm it on staging. Until then this line
+# is a marker, not an installable requirement.
+phonepe-sdk

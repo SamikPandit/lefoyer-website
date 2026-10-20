@@ -178,3 +178,98 @@ def split_address(full_address, line1_max=30, line2_max=30, line3_max=25):
             break  # Can't fit anymore
     
     return (line1.strip(), line2.strip(), line3.strip())
+
+
+# ---------------------------------------------------------------------------
+# Strict boolean coercion (WP-06 / LF-11)
+# ---------------------------------------------------------------------------
+# `BlueDartClient` builds its zeep clients with `Settings(strict=False)`, which
+# makes zeep tolerant of a WSDL whose element types do not match the payload it
+# actually receives. The practical consequence for serviceability is severe: if
+# Blue Dart's Finder WSDL types `DomesticPriorityOutbound` / `eTailCODAirOutbound`
+# as `xsd:string` (or the element arrives untyped and zeep falls back to text),
+# then zeep hands us the *string* `'false'` — and in Python
+#
+#     bool('false') is True
+#
+# so a lenient `if response.DomesticPriorityOutbound:` would report **every**
+# pincode in India as serviceable and the storefront would promise delivery
+# everywhere. The WSDL is fetched over the network at runtime and is not
+# reachable from the build environment, so which case production hits cannot be
+# determined from this repository: the only safe move is to never trust the
+# truthiness of these values and push every one of them through the coercion
+# below before it reaches JSON.
+#
+# Unrecognised input returns `default` (False for a delivery promise) and logs a
+# warning, because "we could not understand the courier" must never render as
+# "yes, we deliver".
+
+import logging as _logging
+from decimal import Decimal
+
+_bool_logger = _logging.getLogger(__name__)
+
+#: Textual spellings Blue Dart / zeep / XML booleans are known to use for true.
+STRICT_BOOL_TRUE_TOKENS = frozenset({'true', 't', 'yes', 'y', '1'})
+
+#: Textual spellings treated as false. The empty string is here deliberately:
+#: an absent XML value means "not offered", not "unknown but probably yes".
+STRICT_BOOL_FALSE_TOKENS = frozenset({
+    'false', 'f', 'no', 'n', '0', '', 'none', 'null', 'nil', 'na', 'n/a', '-',
+})
+
+
+def to_strict_bool(value, default=False, field_name=None):
+    """
+    Coerce a `str | bool | int | None` into a real Python ``bool``.
+
+    Never relies on truthiness. `'false'`, `'False'`, `'FALSE '`, `'no'`, `'0'`
+    and `''` are all ``False``; `'true'`, `'yes'`, `'1'` are ``True``.
+
+    Args:
+        value: Whatever the SOAP layer produced.
+        default: Returned for ``None`` and for anything unrecognised.
+        field_name: Included in the warning log line, for diagnosing a real WSDL.
+
+    Returns:
+        bool: Always a real ``bool`` — never a string, never ``None``.
+    """
+    # bool is a subclass of int, so it has to be tested first.
+    if isinstance(value, bool):
+        return value
+
+    if value is None:
+        return bool(default)
+
+    if isinstance(value, (int, float, Decimal)):
+        return value != 0
+
+    if isinstance(value, bytes):
+        try:
+            value = value.decode('utf-8', 'replace')
+        except Exception:  # pragma: no cover - defensive
+            return bool(default)
+
+    if isinstance(value, str):
+        token = value.strip().lower()
+        if token in STRICT_BOOL_TRUE_TOKENS:
+            return True
+        if token in STRICT_BOOL_FALSE_TOKENS:
+            return False
+        _bool_logger.warning(
+            "Unrecognised boolean %r for %s from Blue Dart; defaulting to %s",
+            value, field_name or 'field', bool(default)
+        )
+        return bool(default)
+
+    # zeep can hand back an xsd value object or an AnyObject. Its `_value_1`
+    # payload is the text node; try that once, then give up loudly.
+    inner = getattr(value, '_value_1', None)
+    if inner is not None and not isinstance(inner, type(value)):
+        return to_strict_bool(inner, default=default, field_name=field_name)
+
+    _bool_logger.warning(
+        "Unsupported boolean type %s (%r) for %s from Blue Dart; defaulting to %s",
+        type(value).__name__, value, field_name or 'field', bool(default)
+    )
+    return bool(default)

@@ -1,204 +1,141 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Box, Typography, Container, Paper } from '@mui/material';
-import { SpaOutlined, ScienceOutlined, AllInclusiveOutlined, FavoriteBorderOutlined } from '@mui/icons-material';
+/**
+ * Benefits — the four-claim proof row.
+ *
+ * LF-05: the hardcoded benefit cards asserted a safety-AND-performance testing
+ * line, a sitewide universal-suitability promise, a superlative-quality boast
+ * and a visible-outcome promise (claims.js ids `universal-suitability`,
+ * `superlative-quality`, `visible-outcome`). This repository contains zero
+ * substantiation for any of them, so §4 withdrew them. This component now
+ * renders `substantiatedClaims()` and nothing else — the softened
+ * "Dermatologist-tested formulations" line arrives from claims.js with the word
+ * *efficacy* already gone, and a claim an admin re-evidences appears here with
+ * no code change. A claim's `footnote` (its evidence line) renders when the
+ * `Claim` row carries one.
+ *
+ * MOTION, LF-26: the old row duplicated four cards into twelve and auto-scrolled
+ * them for 60s, pausable on hover only — a WCAG 2.2.2 failure on every touch
+ * device. The row is now a static grid: there is nothing to pause, nothing to
+ * duplicate, and no `isPaused` state (which the old file declared and never
+ * set). The hover lift is suppressed under `prefers-reduced-motion`.
+ */
 
-const benefits = [
-  {
-    icon: <SpaOutlined />,
-    title: 'Natural Ingredients',
-    description: 'Formulated with the finest botanicals and natural-inspired ingredients for gentle, effective care.',
-  },
-  {
-    icon: <ScienceOutlined />,
-    title: 'Dermatologically Tested',
-    description: 'Rigorously tested for safety and efficacy by certified dermatologists.',
-  },
-  {
-    icon: <AllInclusiveOutlined />,
-    title: 'All Skin Types',
-    description: 'Gentle, balanced formulations perfect for sensitive and reactive skin.',
-  },
-  {
-    icon: <FavoriteBorderOutlined />,
-    title: 'Cruelty-Free',
-    description: 'Committed to ethical practices, never tested on animals.',
-  },
-];
+import { Box, Container, Grid, Typography } from '@mui/material';
+import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
+import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
+import SpaOutlinedIcon from '@mui/icons-material/SpaOutlined';
+import VerifiedOutlinedIcon from '@mui/icons-material/VerifiedOutlined';
+
+import { useBrand } from '../../content/brand';
+import { useSubstantiatedClaims } from '../../content/claims';
+
+/** claims.js `iconKey` -> glyph. `generic` and anything unknown get a mark. */
+const ICONS = {
+  india: PlaceOutlinedIcon,
+  'cruelty-free': FavoriteBorderOutlinedIcon,
+  derm: ScienceOutlinedIcon,
+  botanical: SpaOutlinedIcon,
+  generic: VerifiedOutlinedIcon,
+};
 
 const Benefits = () => {
-  const scrollRef = useRef(null);
-  const [isPaused, setIsPaused] = useState(false);
+  const brand = useBrand();
+  const { claims } = useSubstantiatedClaims();
 
-  // Duplicate benefits for seamless scrolling
-  const duplicatedBenefits = [...benefits, ...benefits, ...benefits];
+  // No evidenced claim, no proof row. There is no placeholder version of this.
+  if (claims.length === 0) return null;
 
   return (
     <Box
-      sx={{
-        py: { xs: 12, md: 16 },
-        backgroundColor: '#FDFBF9', // Warm off-white
-        overflow: 'hidden',
-      }}
+      component="section"
+      aria-labelledby="home-benefits-heading"
+      sx={{ py: { xs: 5, md: 8 }, backgroundColor: 'var(--lf-surface, #FFFFFF)' }}
     >
-      <Container maxWidth="lg">
-        {/* Section Header */}
-        <Box sx={{ textAlign: 'center', mb: { xs: 8, md: 10 } }}>
-          <Typography
-            variant="caption"
-            component="p"
-            sx={{
-              color: 'primary.main',
-              mb: 2,
-              fontWeight: 600,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-            }}
-          >
-            The Le foyeR. Promise
+      <Container>
+        <Box sx={{ mb: { xs: 3, md: 4 }, maxWidth: 640 }}>
+          <Typography variant="overline" component="p" sx={{ color: 'var(--lf-gold-ink, #7A5A24)' }}>
+            What we can evidence
           </Typography>
-
           <Typography
+            id="home-benefits-heading"
             variant="h2"
             component="h2"
-            sx={{
-              color: 'text.primary',
-              mb: 3,
-            }}
+            sx={{ color: 'var(--lf-ink, #14110F)', mt: 0.5, mb: 1.5 }}
           >
-            Why Choose Le foyeR.?
+            Only what we can stand behind
           </Typography>
-
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{
-              maxWidth: 650,
-              mx: 'auto',
-              fontSize: '1.1rem',
-              lineHeight: 1.6,
-            }}
-          >
-            We're committed to bringing you the highest quality in natural beauty care,
-            combining tradition with innovation for radiant results.
+          <Box className="lf-rule" component="hr" sx={{ maxWidth: 160, mb: 2 }} />
+          <Typography variant="body2" sx={{ color: 'var(--lf-ink-2, #4A433C)' }}>
+            {brand.territoryLine}
           </Typography>
         </Box>
 
-        {/* Carousel Container */}
-        <Box
-          sx={{
-            position: 'relative',
-            width: '100%',
-            overflow: 'hidden',
-            '&::before, &::after': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              width: '100px',
-              height: '100%',
-              zIndex: 2,
-              pointerEvents: 'none',
-            },
-            '&::before': {
-              left: 0,
-              background: 'linear-gradient(to right, #FDFBF9, transparent)',
-            },
-            '&::after': {
-              right: 0,
-              background: 'linear-gradient(to left, #FDFBF9, transparent)',
-            },
-          }}
-        >
-          <Box
-            sx={{
-              display: 'flex',
-              gap: 4,
-              width: 'max-content',
-              animation: 'scroll 60s linear infinite',
-              '&:hover': {
-                animationPlayState: 'paused',
-              },
-              '@keyframes scroll': {
-                '0%': { transform: 'translateX(0)' },
-                '100%': { transform: 'translateX(-33.33%)' }, // Adjust based on duplication
-              },
-              py: 2,
-            }}
-          >
-            {duplicatedBenefits.map((benefit, index) => (
-              <Paper
-                key={`${benefit.title}-${index}`}
-                elevation={0}
-                sx={{
-                  width: 300, // Strict width
-                  height: 320, // Strict height
-                  flexShrink: 0,
-                  p: 4,
-                  textAlign: 'center',
-                  backgroundColor: 'white',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  '&:hover': {
-                    transform: 'translateY(-8px)',
-                    boxShadow: '0 12px 30px rgba(0,0,0,0.06)',
-                    borderColor: 'primary.main',
-                    '& .icon-box': {
-                      backgroundColor: 'primary.main',
-                      color: 'white',
-                    }
-                  }
-                }}
-              >
-                {/* Icon Container */}
+        <Grid container spacing={2}>
+          {claims.map((claim) => {
+            const Icon = ICONS[claim.iconKey] || ICONS.generic;
+
+            return (
+              <Grid key={claim.id} size={{ xs: 12, sm: 6, md: 3 }}>
                 <Box
-                  className="icon-box"
                   sx={{
-                    width: 70,
-                    height: 70,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mb: 3,
-                    backgroundColor: 'rgba(201, 169, 110, 0.1)',
-                    color: 'primary.main',
-                    transition: 'all 0.3s ease',
+                    height: '100%',
+                    p: { xs: 2, md: 2.5 },
+                    borderRadius: 'var(--lf-r-card, 14px)',
+                    border: '1px solid var(--lf-hairline, #E7E0D6)',
+                    backgroundColor: 'var(--lf-surface, #FFFFFF)',
+                    boxShadow: 'var(--lf-e-edge)',
+                    transition: 'transform var(--lf-dur-2) var(--lf-ease)',
+                    '@media (hover:hover)': { '&:hover': { transform: 'translateY(-2px)' } },
+                    '@media (prefers-reduced-motion: reduce)': {
+                      transition: 'none',
+                      '&:hover': { transform: 'none' },
+                    },
                   }}
                 >
-                  {React.cloneElement(benefit.icon, { sx: { fontSize: 32 } })}
+                  <Box
+                    aria-hidden="true"
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mb: 1.5,
+                      backgroundColor: 'var(--lf-gold-tint, #F7F0E2)',
+                      color: 'var(--lf-gold-ink, #7A5A24)',
+                    }}
+                  >
+                    <Icon sx={{ fontSize: 24 }} />
+                  </Box>
+
+                  <Typography variant="h5" component="h3" sx={{ color: 'var(--lf-ink, #14110F)' }}>
+                    {claim.label}
+                  </Typography>
+
+                  {claim.description ? (
+                    <Typography
+                      variant="body2"
+                      sx={{ mt: 0.75, color: 'var(--lf-ink-2, #4A433C)' }}
+                    >
+                      {claim.description}
+                    </Typography>
+                  ) : null}
+
+                  {claim.footnote ? (
+                    <Typography
+                      variant="caption"
+                      component="p"
+                      sx={{ mt: 1, color: 'var(--lf-ink-3, #6E675F)' }}
+                    >
+                      {claim.footnote}
+                    </Typography>
+                  ) : null}
                 </Box>
-
-                <Typography
-                  variant="h6"
-                  gutterBottom
-                  sx={{
-                    fontWeight: 600,
-                    color: 'text.primary',
-                    mb: 2,
-                    fontSize: '1.1rem',
-                  }}
-                >
-                  {benefit.title}
-                </Typography>
-
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{
-                    lineHeight: 1.7,
-                  }}
-                >
-                  {benefit.description}
-                </Typography>
-              </Paper>
-            ))}
-          </Box>
-        </Box>
+              </Grid>
+            );
+          })}
+        </Grid>
       </Container>
     </Box>
   );

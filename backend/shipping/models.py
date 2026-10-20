@@ -2,6 +2,8 @@ from django.db import models
 from django.conf import settings
 from orders.models import Order
 
+from .constants import TRACKING_PORTAL_URL_TEMPLATE
+
 
 class Shipment(models.Model):
     """
@@ -136,6 +138,33 @@ class Shipment(models.Model):
     def is_active(self):
         """Returns True if shipment is still in transit and needs tracking"""
         return self.status not in ['delivered', 'cancelled', 'rto_delivered']
+
+    @property
+    def tracking_url(self):
+        """
+        Absolute, external URL where the customer can track this shipment.
+
+        This replaces the `/api/shipping/track/<awb>/` string the order
+        serializer used to build. That was a **relative path into our own JSON
+        API**, and the order pages pass this value to `navigate()` /
+        `window.open` — so "Track your order" either 404'd on the SPA router or
+        rendered raw JSON. The right destination is Blue Dart's own public
+        tracking page, which is what this returns.
+
+        Returns:
+            str | None: `None` until an AWB exists, so the UI can hide the
+            action instead of opening a page that cannot resolve anything.
+        """
+        if not self.awb_number:
+            return None
+        template = getattr(
+            settings, 'BLUEDART_TRACKING_PORTAL_URL', TRACKING_PORTAL_URL_TEMPLATE
+        ) or TRACKING_PORTAL_URL_TEMPLATE
+        try:
+            return template.format(awb=self.awb_number)
+        except (KeyError, IndexError):
+            # A misconfigured override must not break order pages.
+            return TRACKING_PORTAL_URL_TEMPLATE.format(awb=self.awb_number)
 
     def get_status_display_color(self):
         """Returns color code for status badge in frontend"""

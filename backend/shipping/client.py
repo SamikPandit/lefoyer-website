@@ -33,6 +33,7 @@ from .utils import (
     get_billable_weight,
     truncate_address,
     split_address,
+    to_strict_bool,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,18 @@ logger = logging.getLogger(__name__)
 
 class BlueDartAPIError(Exception):
     """Custom exception for Blue Dart API errors"""
+    pass
+
+
+class BlueDartConfigurationError(BlueDartAPIError):
+    """
+    Raised when Blue Dart credentials are absent, so no call is even attempted.
+
+    A subclass of `BlueDartAPIError` on purpose: every existing caller already
+    handles that (the views answer `503`, the Celery tasks record it), and
+    "the courier is not configured" is operationally the same class of event as
+    "the courier is unreachable" — the shopper must still be allowed to order.
+    """
     pass
 
 
@@ -87,11 +100,50 @@ class BlueDartClient:
         self._pickup_client = None
         self.transport = transport
         self.zeep_settings = zeep_settings
-    
+
+    # ------------------------------------------------------------------
+    # Credentials
+    # ------------------------------------------------------------------
+    def missing_credentials(self):
+        """
+        Names of the credential settings that are empty.
+
+        `BLUEDART_LOGIN_ID` and `BLUEDART_LICENCE_KEY` default to `''`, so a
+        deployment without a courier account reaches this client with blank
+        credentials. Every SOAP call carries them inside `Profile`, so Blue Dart
+        would answer with an authentication fault after a 30-second WSDL fetch
+        over the network. Checking first turns that into an immediate, honest
+        "not configured".
+
+        Returns:
+            list[str]: Empty when the client can be used.
+        """
+        required = (
+            ('BLUEDART_LOGIN_ID', self.login_id),
+            ('BLUEDART_LICENCE_KEY', self.licence_key),
+        )
+        return [name for name, value in required if not str(value or '').strip()]
+
+    def _require_credentials(self):
+        """Raise `BlueDartConfigurationError` if credentials are not configured."""
+        missing = self.missing_credentials()
+        if missing:
+            logger.error(
+                "Blue Dart is not configured: %s %s empty",
+                ', '.join(missing),
+                'is' if len(missing) == 1 else 'are',
+            )
+            raise BlueDartConfigurationError(
+                'Blue Dart credentials are not configured ({}).'.format(
+                    ', '.join(missing)
+                )
+            )
+
     @property
     def finder_client(self):
         """Lazy-load Finder SOAP client"""
         if self._finder_client is None:
+            self._require_credentials()
             self._finder_client = Client(
                 self.wsdl_endpoints['finder'],
                 transport=self.transport,
@@ -103,6 +155,7 @@ class BlueDartClient:
     def waybill_client(self):
         """Lazy-load Waybill SOAP client"""
         if self._waybill_client is None:
+            self._require_credentials()
             self._waybill_client = Client(
                 self.wsdl_endpoints['waybill'],
                 transport=self.transport,
@@ -114,6 +167,7 @@ class BlueDartClient:
     def pickup_client(self):
         """Lazy-load Pickup SOAP client"""
         if self._pickup_client is None:
+            self._require_credentials()
             self._pickup_client = Client(
                 self.wsdl_endpoints['pickup'],
                 transport=self.transport,
@@ -202,49 +256,81 @@ class BlueDartClient:
             
         Returns:
             dict: {
-                'serviceable': bool,
-                'cod_available': bool,
+                'serviceable': bool,     # a real bool, never the string 'false'
+                'cod_available': bool,   # a real bool, never the string 'false'
                 'area_code': str or None,
                 'error': str or None
             }
+
+        Every flag in the returned dict goes through `to_strict_bool`. The zeep
+        clients are built with `Settings(strict=False)`, so a WSDL that types
+        these elements as strings would otherwise hand back `'false'`, which is
+        **truthy** in Python — and this endpoint would then promise delivery to
+        every pincode in India. See the note above `to_strict_bool` in utils.py.
         """
         logger.info(f"Checking serviceability for pincode: {pincode}")
-        
+
         try:
             response = self.finder_client.service.GetServicesforPincode(
                 pinCode=str(pincode),
                 profile=self._get_profile()
             )
-            
-            # Check for errors
-            if hasattr(response, 'IsError') and response.IsError:
-                error_msg = getattr(response, 'ErrorMessage', 'Unknown error')
+
+            # Check for errors. `IsError` is coerced too: as a string it would be
+            # truthy either way, so without this every lookup would look failed.
+            is_error = to_strict_bool(
+                getattr(response, 'IsError', False),
+                default=False,
+                field_name='IsError',
+            )
+            if is_error:
+                error_msg = getattr(response, 'ErrorMessage', None) or 'Unknown error'
                 logger.warning(f"Pincode {pincode} not serviceable: {error_msg}")
                 return {
                     'serviceable': False,
                     'cod_available': False,
                     'area_code': None,
-                    'error': error_msg
+                    'error': str(error_msg)
                 }
-            
-            # Check for Domestic Priority service (our default)
-            serviceable = getattr(response, 'DomesticPriorityOutbound', False)
-            
-            # Check COD availability
-            cod_available = getattr(response, 'eTailCODAirOutbound', False)
-            
-            logger.info(f"Pincode {pincode}: serviceable={serviceable}, COD={cod_available}")
-            
+
+            # Check for Domestic Priority service (our default). Unknown values
+            # coerce to False: we do not promise a delivery we cannot confirm.
+            raw_serviceable = getattr(response, 'DomesticPriorityOutbound', False)
+            serviceable = to_strict_bool(
+                raw_serviceable,
+                default=False,
+                field_name='DomesticPriorityOutbound',
+            )
+
+            # Check COD availability. Same rule — never claim COD on a maybe.
+            raw_cod = getattr(response, 'eTailCODAirOutbound', False)
+            cod_available = to_strict_bool(
+                raw_cod,
+                default=False,
+                field_name='eTailCODAirOutbound',
+            )
+
+            logger.info(
+                "Pincode %s: serviceable=%r (raw %s %r), COD=%r (raw %s %r)",
+                pincode,
+                serviceable, type(raw_serviceable).__name__, raw_serviceable,
+                cod_available, type(raw_cod).__name__, raw_cod,
+            )
+
             return {
                 'serviceable': serviceable,
                 'cod_available': cod_available,
                 'area_code': None,  # Area code comes from transit time API
                 'error': None
             }
-            
+
         except ZeepFault as e:
             logger.error(f"SOAP fault checking serviceability for {pincode}: {e}")
             raise BlueDartAPIError(f"Blue Dart API error: {str(e)}")
+        except BlueDartAPIError:
+            # Already one of ours (e.g. BlueDartConfigurationError).
+            # Re-raise unchanged so callers can tell the cases apart.
+            raise
         except Exception as e:
             logger.error(f"Unexpected error checking serviceability for {pincode}: {e}")
             raise BlueDartAPIError(f"Unexpected error: {str(e)}")
@@ -288,9 +374,15 @@ class BlueDartClient:
                 profile=self._get_profile()
             )
             
-            # Check for errors
-            if hasattr(response, 'IsError') and response.IsError:
-                error_msg = getattr(response, 'ErrorMessage', 'Unknown error')
+            # Check for errors. Coerced for the same reason as in
+            # `check_serviceability`: a string `'false'` is truthy, and an
+            # always-error transit lookup would hide every delivery date.
+            if to_strict_bool(
+                getattr(response, 'IsError', False),
+                default=False,
+                field_name='IsError',
+            ):
+                error_msg = getattr(response, 'ErrorMessage', None) or 'Unknown error'
                 logger.warning(f"Transit time error for {dest_pincode}: {error_msg}")
                 return {
                     'expected_delivery_date': None,
@@ -327,6 +419,10 @@ class BlueDartClient:
         except ZeepFault as e:
             logger.error(f"SOAP fault getting transit time for {dest_pincode}: {e}")
             raise BlueDartAPIError(f"Blue Dart API error: {str(e)}")
+        except BlueDartAPIError:
+            # Already one of ours (e.g. BlueDartConfigurationError).
+            # Re-raise unchanged so callers can tell the cases apart.
+            raise
         except Exception as e:
             logger.error(f"Unexpected error getting transit time for {dest_pincode}: {e}")
             raise BlueDartAPIError(f"Unexpected error: {str(e)}")
@@ -516,6 +612,10 @@ class BlueDartClient:
         except ZeepFault as e:
             logger.error(f"SOAP fault generating waybill for order #{order.id}: {e}")
             raise BlueDartAPIError(f"Blue Dart API error: {str(e)}")
+        except BlueDartAPIError:
+            # Already one of ours (e.g. BlueDartConfigurationError).
+            # Re-raise unchanged so callers can tell the cases apart.
+            raise
         except Exception as e:
             logger.error(f"Unexpected error generating waybill for order #{order.id}: {e}")
             raise BlueDartAPIError(f"Unexpected error: {str(e)}")
@@ -546,7 +646,12 @@ class BlueDartClient:
             }
         """
         logger.info(f"Tracking shipment: {awb_number}")
-        
+
+        # The tracking servlet authenticates with the same login id plus the
+        # tracking licence key; without them it answers an HTML error page that
+        # xmltodict cannot parse. Fail with the configuration error instead.
+        self._require_credentials()
+
         params = {
             'handler': 'tnt',
             'action': 'custawbquery',
@@ -636,6 +741,10 @@ class BlueDartClient:
         except requests.RequestException as e:
             logger.error(f"HTTP error tracking {awb_number}: {e}")
             raise BlueDartAPIError(f"Tracking API error: {str(e)}")
+        except BlueDartAPIError:
+            # Already one of ours (e.g. BlueDartConfigurationError).
+            # Re-raise unchanged so callers can tell the cases apart.
+            raise
         except Exception as e:
             logger.error(f"Unexpected error tracking {awb_number}: {e}")
             raise BlueDartAPIError(f"Unexpected error: {str(e)}")
@@ -720,6 +829,10 @@ class BlueDartClient:
         except ZeepFault as e:
             logger.error(f"SOAP fault registering pickup: {e}")
             raise BlueDartAPIError(f"Blue Dart API error: {str(e)}")
+        except BlueDartAPIError:
+            # Already one of ours (e.g. BlueDartConfigurationError).
+            # Re-raise unchanged so callers can tell the cases apart.
+            raise
         except Exception as e:
             logger.error(f"Unexpected error registering pickup: {e}")
             raise BlueDartAPIError(f"Unexpected error: {str(e)}")
@@ -766,6 +879,10 @@ class BlueDartClient:
         except ZeepFault as e:
             logger.error(f"SOAP fault cancelling waybill {awb_number}: {e}")
             raise BlueDartAPIError(f"Blue Dart API error: {str(e)}")
+        except BlueDartAPIError:
+            # Already one of ours (e.g. BlueDartConfigurationError).
+            # Re-raise unchanged so callers can tell the cases apart.
+            raise
         except Exception as e:
             logger.error(f"Unexpected error cancelling waybill {awb_number}: {e}")
             raise BlueDartAPIError(f"Unexpected error: {str(e)}")

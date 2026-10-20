@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+# Authenticated and transactional pages carry no indexable content and must not be crawled.
+Disallow: /cart
+Disallow: /checkout
+Disallow: /profile
+Disallow: /orders
+Disallow: /order-confirmation
+Disallow: /wishlist
+Disallow: /login
+Disallow: /signup
+Disallow: /verify-email
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# Search result pages are infinite-space; the product and category pages are the canonical surfaces.
+Disallow: /search
+
+Sitemap: https://www.lefoyerglobal.com/sitemap.xml

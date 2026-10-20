@@ -24,6 +24,7 @@ class ShipmentAdmin(admin.ModelAdmin):
         'customer_name',
         'destination_pincode',
         'status_badge',
+        'tracking_link',
         'created_at',
         'delivered_at'
     )
@@ -37,6 +38,7 @@ class ShipmentAdmin(admin.ModelAdmin):
         'updated_at',
         'order',
         'awb_number',
+        'tracking_link',
         'destination_area',
         'shipped_at',
         'delivered_at',
@@ -50,6 +52,7 @@ class ShipmentAdmin(admin.ModelAdmin):
         ('Shipment Details', {
             'fields': (
                 'awb_number',
+                'tracking_link',
                 'pickup_token',
                 'status',
                 'expected_delivery_date',
@@ -101,6 +104,17 @@ class ShipmentAdmin(admin.ModelAdmin):
         return '-'
     customer_name.short_description = 'Customer'
     
+    def tracking_link(self, obj):
+        """Open Blue Dart's public tracking page — the same absolute URL the
+        customer's order page links to (`Shipment.tracking_url`)."""
+        url = obj.tracking_url
+        if not url:
+            return '-'
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener noreferrer">Track</a>', url
+        )
+    tracking_link.short_description = 'Blue Dart'
+
     def status_badge(self, obj):
         """Display status with color"""
         color = obj.get_status_display_color()

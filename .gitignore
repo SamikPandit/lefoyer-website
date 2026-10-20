@@ -207,3 +207,6 @@ marimo/_lsp/
 __marimo__/
 
 node_modules
+
+# Generated at build time by frontend/scripts/gen-sitemap.mjs — regenerated on every `npm run build`.
+frontend/public/sitemap.xml
