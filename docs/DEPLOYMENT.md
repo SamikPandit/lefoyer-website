@@ -209,3 +209,48 @@ strength of local checks:
    string `'false'` is truthy in Python and **every pincode would report serviceable**. A normaliser is
    in place; which case production actually hits is unverified.
 8. Real email deliverability through Hostinger SMTP, and that verification links contain no `/#/`.
+
+## Deploy incident, 2026-10-20 — read before the next deploy
+
+The first run of `scripts/deploy.sh` took the site down for about a minute. Cause and fix, recorded
+so it is not rediscovered:
+
+**`rsync -a` preserves numeric uid/gid.** The developer workstation's uid 1000 is `samikpandit`;
+uid 1000 on this host is `ubuntu`. So syncing `backend/` rewrote the whole tree from
+`www-data:www-data` to `ubuntu:ubuntu`. `lefoyer-backend.service` runs as `www-data`, which could
+then no longer create `backend/lefoyer.sock`, and gunicorn failed with
+`[Errno 13] Permission denied` / `Can't connect to /var/www/lefoyer/backend/lefoyer.sock`.
+`--delete` had also removed the live socket from under the running process.
+
+Fixed in `scripts/deploy.sh`: the backend and frontend syncs now pass
+`--no-o --no-g --chown=www-data:www-data`, exclude `*.sock`, and a `chown -R www-data:www-data`
+runs after the publish. Recovery, if it ever happens again:
+
+```bash
+ssh hostinger '
+  chown -R www-data:www-data /var/www/lefoyer/backend /var/www/lefoyer/frontend/dist
+  rm -f /var/www/lefoyer/backend/lefoyer.sock
+  systemctl restart lefoyer-backend lefoyer-celery'
+```
+
+**Everything under `/var/www/lefoyer` must be owned by `www-data:www-data`.**
+
+### Also discovered during this deploy
+
+`recompute_product_ratings` found two products carrying hand-typed ratings with no reviews behind
+them, and reset both:
+
+```
+the-daily-invisible-moisturizer: rating 4.50 -> 0.00, reviews_count 40 -> 0
+glow-game-waterless-facewash:    rating 4.10 -> 0.00, reviews_count 50 -> 0
+```
+
+There are zero rows in `reviews_review`. Those numbers were typed into the Django admin; "4.5 from
+40 reviews" was never real. They are now `null`, and both PDPs show "Be the first to review this
+product" instead. That is LF-01 working as specified, but it is a visible change to those two pages
+and the business should know it happened. The columns are now readonly in admin, so they cannot be
+re-typed — the only way to get a rating back is a real review.
+
+`PHONEPE_ENV` is still `SANDBOX` on production. Live payments will not work against sandbox
+credentials. This predates the change-set and was deliberately left alone; flipping it to
+`PRODUCTION` is a commercial decision and needs the prod merchant credentials verified first.

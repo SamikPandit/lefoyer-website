@@ -5,6 +5,8 @@ This module provides a client for interacting with Blue Dart's shipping APIs.
 Handles all SOAP communication, request/response parsing, and error handling.
 """
 import logging
+import tempfile
+import os
 import base64
 import requests
 import xmltodict
@@ -83,9 +85,27 @@ class BlueDartClient:
         env = 'demo' if self.demo_mode else 'production'
         self.wsdl_endpoints = WSDL_ENDPOINTS[env]
         
-        # Configure zeep transport with caching
+        # Configure zeep transport with caching.
+        #
+        # SqliteCache() with no path defaults to `~/.cache/zeep.db`. Under gunicorn HOME is
+        # /var/www, which www-data cannot write, so constructing the client raised
+        # PermissionError('/var/www/.cache') and the serviceability endpoint 500'd in
+        # production. Pin the cache somewhere the service user owns, and fall back to an
+        # uncached transport rather than letting a cache problem break delivery checks.
+        try:
+            cache_path = getattr(settings, 'BLUEDART_WSDL_CACHE_PATH', None)
+            if not cache_path:
+                cache_path = os.path.join(tempfile.gettempdir(), 'lefoyer-zeep-cache.db')
+            cache = SqliteCache(path=cache_path)
+        except Exception as cache_error:  # pragma: no cover - environment dependent
+            logger.warning(
+                "Blue Dart WSDL cache unavailable (%s); continuing without a cache.",
+                cache_error,
+            )
+            cache = None
+
         transport = Transport(
-            cache=SqliteCache(),
+            cache=cache,
             timeout=30,
             operation_timeout=30
         )

@@ -80,9 +80,14 @@ say "    backups tagged $TS"
 say "2 · Rehearse the migration against a COPY of the live database"
 # ---------------------------------------------------------------------------
 # Upload the code to a staging dir first so the rehearsal runs the NEW migrations.
-rsync -az --delete \
+# --chown and --no-o --no-g matter: rsync -a preserves NUMERIC uid/gid, and the developer's
+# local uid 1000 maps to `ubuntu` on this host. Without them the whole backend tree flips from
+# www-data to ubuntu and gunicorn can no longer create its unix socket — which takes the site
+# down at restart. '*.sock' is excluded because the live socket lives inside backend/ and
+# --delete would otherwise remove it out from under the running process.
+rsync -az --delete --no-o --no-g --chown=www-data:www-data \
   --exclude venv --exclude .env --exclude db.sqlite3 --exclude media \
-  --exclude staticfiles --exclude __pycache__ --exclude '*.pyc' \
+  --exclude staticfiles --exclude __pycache__ --exclude '*.pyc' --exclude '*.sock' \
   -e "ssh -o BatchMode=yes" \
   "$REPO_ROOT/backend/" "$SSH_HOST:$APP_ROOT/backend.incoming/"
 
@@ -125,8 +130,11 @@ rsh "set -e
   rm -rf backend.prev && cp -al backend backend.prev 2>/dev/null || cp -a backend backend.prev
   rsync -a --delete \
     --exclude venv --exclude .env --exclude db.sqlite3 --exclude media --exclude staticfiles \
+    --exclude '*.sock' \
     backend.incoming/ backend/
-  rm -rf backend.incoming"
+  rm -rf backend.incoming
+  # Belt and braces: the service runs as www-data and must own everything it writes.
+  chown -R www-data:www-data backend"
 
 # ---------------------------------------------------------------------------
 say "5 · Migrate for real, collect static, recompute rating cache"
@@ -141,13 +149,15 @@ rsh "set -e
 # ---------------------------------------------------------------------------
 say "6 · Publish frontend"
 # ---------------------------------------------------------------------------
-rsync -az --delete -e "ssh -o BatchMode=yes" \
+rsync -az --delete --no-o --no-g --chown=www-data:www-data -e "ssh -o BatchMode=yes" \
   "$REPO_ROOT/frontend/dist/" "$SSH_HOST:$APP_ROOT/frontend/dist/"
+rsh "chown -R www-data:www-data $APP_ROOT/frontend/dist"
 
 # ---------------------------------------------------------------------------
 say "7 · Restart"
 # ---------------------------------------------------------------------------
 rsh "set -e
+  rm -f $APP_ROOT/backend/lefoyer.sock
   systemctl restart lefoyer-backend
   systemctl restart lefoyer-celery || echo '    (celery restart skipped)'
   nginx -t && systemctl reload nginx

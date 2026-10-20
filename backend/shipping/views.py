@@ -170,9 +170,13 @@ def check_serviceability(request):
         )
     except Exception as exc:  # noqa: BLE001 - last resort, must not leak internals
         logger.exception("Unexpected error checking serviceability for %s: %s", pincode, exc)
+        # 503, not 500. Whatever went wrong here, the shopper's situation is the same: we
+        # cannot check delivery right now, and they can still place the order. The frontend's
+        # PincodeCheck renders that honest degraded state for 503; a 500 reads to it as a bug
+        # and produces a dead end instead. The traceback is in the log either way.
         return Response(
             error_body(SERVICEABILITY_UNAVAILABLE_MESSAGE),
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
 
