@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,14 +22,37 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from .env
 load_dotenv(BASE_DIR / '.env')
 
+
+def env_bool(name, default=False):
+    """Parse a boolean environment variable without surprises.
+
+    Anything that is not an explicit truthy token is False, so a stray
+    ``DEBUG=flase`` can never accidentally enable debug mode.
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ('true', '1', 'yes', 'on')
+
+
 # ============================================================================
 # SECURITY
 # ============================================================================
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-only-change-me')
 
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+# DEBUG defaults to False on purpose. It used to default to True, which meant a
+# production box that forgot to set the variable silently ran on the local
+# SQLite file with the development CORS list. Local development must opt in
+# explicitly (`DEBUG=True` in backend/.env or in the shell) — see README.
+DEBUG = env_bool('DEBUG', default=False)
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+if not DEBUG and SECRET_KEY == 'django-insecure-dev-only-change-me':
+    raise ImproperlyConfigured(
+        "SECRET_KEY is still the insecure development placeholder while DEBUG is "
+        "False. Set SECRET_KEY in the environment before running in production."
+    )
 
 
 # Application definition
@@ -41,6 +66,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    # Required by SIMPLE_JWT's BLACKLIST_AFTER_ROTATION below.
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'products',
     'accounts',
@@ -51,6 +78,8 @@ INSTALLED_APPS = [
     'django_filters',
     'coupons',
     'shipping',
+    'newsletter',
+    'content',
     'django_celery_beat',
 ]
 
@@ -61,7 +90,9 @@ JAZZMIN_SETTINGS = {
     "welcome_sign": "Welcome to Le foyeR. Admin",
     "copyright": "Le foyeR. Global",
     "site_logo": None,
-    "custom_css": "/home/samikpandit/scpl/lefoyer-ecommerce/backend/static/admin/css/custom.css",
+    # Must be a path relative to STATIC_URL, never an absolute filesystem path
+    # from one developer's machine.
+    "custom_css": "admin/css/custom.css",
     "custom_links": {
         "orders": [{
             "name": "Sales Analytics",
@@ -105,35 +136,38 @@ WSGI_APPLICATION = 'lefoyer.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+#
+# The choice depends on DATABASE_URL alone. If it is set we use it, in every
+# environment, so that staging/production cannot be accidentally demoted to the
+# bundled SQLite file. If it is unset we only fall back to SQLite under DEBUG;
+# otherwise we refuse to start.
 
 DATABASE_URL = os.getenv('DATABASE_URL', '')
 
-if DATABASE_URL and not DEBUG:
-    # Production: Use PostgreSQL from DATABASE_URL
+SQLITE_DATABASE = {
+    'ENGINE': 'django.db.backends.sqlite3',
+    'NAME': BASE_DIR / 'db.sqlite3',
+}
+
+if DATABASE_URL:
     try:
         import dj_database_url
-        DATABASES = {
-            'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
-        }
-    except ImportError:
-        import logging
-        logging.getLogger(__name__).warning(
-            "dj-database-url not installed. Install with: pip install dj-database-url. Falling back to SQLite."
-        )
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
-        }
-else:
-    # Development: Use SQLite
+    except ImportError as exc:  # pragma: no cover - deployment misconfiguration
+        raise ImproperlyConfigured(
+            "DATABASE_URL is set but dj-database-url is not installed. "
+            "Install it with: pip install dj-database-url"
+        ) from exc
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
+elif DEBUG:
+    DATABASES = {'default': SQLITE_DATABASE}
+else:
+    raise ImproperlyConfigured(
+        "DATABASE_URL is not set and DEBUG is False. Refusing to start on the "
+        "bundled SQLite file in a non-debug environment. Set DATABASE_URL, or "
+        "set DEBUG=True for local development."
+    )
 
 
 # Password validation
@@ -172,6 +206,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -181,11 +216,35 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ============================================================================
+# CACHES
+# ============================================================================
+# Per-process in-memory cache. It is enough for the 300s content caching used
+# by /api/content/site-settings/ and /api/content/policy/ and for the 24h
+# pincode serviceability cache; both tolerate per-worker duplication. Swap in a
+# shared backend (Redis) if cross-worker consistency ever becomes a requirement.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'lefoyer-default',
+        'TIMEOUT': 300,
+    }
+}
+
 REST_FRAMEWORK = {
+    # Exactly one reverse proxy (nginx) sits in front of gunicorn, and its /api/ location sets
+    # `X-Forwarded-For $proxy_add_x_forwarded_for`, which APPENDS the real peer address. Without
+    # this, DRF trusts the first XFF entry — which the client supplies — so every IP-keyed
+    # throttle could be bypassed, or spent on someone else, by sending a forged header.
+    'NUM_PROXIES': 1,
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
     'DEFAULT_THROTTLE_CLASSES': [
@@ -193,9 +252,50 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
+        # Global floors. `anon` at 30/minute is far too tight for ordinary
+        # catalogue browsing (a debounced search box alone can spend it in
+        # seconds), so every public read endpoint opts into the much higher
+        # `catalogue` scope via ScopedRateThrottle instead of inheriting these.
         'anon': '30/minute',
         'user': '120/minute',
+        # Public read surface: catalogue, taxonomy, content singletons.
+        'catalogue': '300/minute',
+        # Write/abuse-sensitive scopes.
+        'resend_verification': '3/hour',
+        'newsletter': '10/hour',
+        'coupon_validate': '20/hour',
+        'notify_me': '5/hour',
+        'support': '5/hour',
+        # Required by the account endpoints' own rate limits. They are declared
+        # here because settings.py has a single owner and the account views
+        # must not have to edit it: POST /api/auth/register/ is specified at
+        # 10/hour and POST /api/auth/password-reset/ at 3/hour. They get their
+        # own buckets rather than sharing `resend_verification`, so a user who
+        # has spent their resend attempts can still reset a password.
+        'register': '10/hour',
+        'password_reset': '3/hour',
+        # Per-address cap, counted across all requesters, so an address cannot be
+        # mailbombed now that the tight bucket is per (email, requester).
+        'email_flood': '10/hour',
     },
+}
+
+# ============================================================================
+# SIMPLE JWT
+# ============================================================================
+# Without this block SimpleJWT's 5-minute default ACCESS_TOKEN_LIFETIME applies,
+# which logged users out mid-session (and the stored refresh token was never
+# used). Rotation + blacklisting requires the token_blacklist app registered
+# above.
+from datetime import timedelta  # noqa: E402  (kept next to the block it serves)
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=14),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -224,28 +324,53 @@ CSRF_TRUSTED_ORIGINS = [
 
 # dotenv already loaded at top of file
 
+# ============================================================================
 # PhonePe Configuration
+# ============================================================================
+# No credential literals live in this file. A missing credential must surface as
+# a gateway error at call time, not as a silent fallback onto someone else's
+# shared UAT merchant account.
 PHONEPE_ENV = os.getenv('PHONEPE_ENV', 'SANDBOX')
 
 if PHONEPE_ENV == 'PRODUCTION':
-    PHONEPE_MERCHANT_ID = os.getenv('PHONEPE_PROD_MERCHANT_ID')
-    PHONEPE_SALT_KEY = os.getenv('PHONEPE_PROD_SALT_KEY')
-    PHONEPE_SALT_INDEX = int(os.getenv('PHONEPE_PROD_SALT_INDEX', 1))
+    PHONEPE_MERCHANT_ID = os.getenv('PHONEPE_PROD_MERCHANT_ID', '')
+    PHONEPE_SALT_KEY = os.getenv('PHONEPE_PROD_SALT_KEY', '')
+    PHONEPE_SALT_INDEX = int(os.getenv('PHONEPE_PROD_SALT_INDEX') or 1)
 else:
-    # Use standard UAT credentials if not provided in env
-    PHONEPE_MERCHANT_ID = os.getenv('PHONEPE_TEST_MERCHANT_ID', 'PGTESTPAYUAT')
-    PHONEPE_SALT_KEY = os.getenv('PHONEPE_TEST_SALT_KEY', '099eb0cd-02cf-4e2a-8aca-3e6c6aff0399')
-    PHONEPE_SALT_INDEX = int(os.getenv('PHONEPE_TEST_SALT_INDEX', 1))
+    PHONEPE_MERCHANT_ID = os.getenv('PHONEPE_TEST_MERCHANT_ID', '')
+    PHONEPE_SALT_KEY = os.getenv('PHONEPE_TEST_SALT_KEY', '')
+    PHONEPE_SALT_INDEX = int(os.getenv('PHONEPE_TEST_SALT_INDEX') or 1)
 
-PHONEPE_CALLBACK_URL = os.getenv("PHONEPE_CALLBACK_URL", "http://localhost:8000/api/orders/payment/callback/")
+PHONEPE_CALLBACK_URL = os.getenv(
+    "PHONEPE_CALLBACK_URL", "http://localhost:8000/api/orders/payment/callback/"
+)
 
-SITE_URL = os.getenv("SITE_URL", "http://localhost:5173")
-API_URL = os.getenv("API_URL", "http://localhost:8000")
+# PhonePe V2 server-to-server callbacks are authenticated with a username and
+# password that the merchant chooses and registers with PhonePe; the gateway
+# sends SHA256(username:password) in the Authorization header. Both must be set
+# for the callback endpoint to accept anything.
+PHONEPE_CALLBACK_USERNAME = os.getenv('PHONEPE_CALLBACK_USERNAME', '')
+PHONEPE_CALLBACK_PASSWORD = os.getenv('PHONEPE_CALLBACK_PASSWORD', '')
+
+SITE_URL = os.getenv("SITE_URL", "http://localhost:5173").rstrip('/')
+API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip('/')
+
+if not DEBUG and ('localhost' in SITE_URL or '127.0.0.1' in SITE_URL):
+    raise ImproperlyConfigured(
+        f"SITE_URL is {SITE_URL!r} while DEBUG is False. Every payment redirect "
+        "and every verification / password-reset email link is built from it, so "
+        "it must be the public site origin in a non-debug environment."
+    )
 
 # ============================================================================
 # EMAIL Configuration (Hostinger SMTP)
 # ============================================================================
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+if DEBUG:
+    # Local development has no SMTP credentials: print the message, including
+    # verification and password-reset links, to the runserver console.
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.hostinger.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 465))
 EMAIL_USE_SSL = True
@@ -266,8 +391,14 @@ CELERY_TASK_ACKS_LATE = True  # Re-deliver tasks if worker crashes
 CELERY_RESULT_EXPIRES = 3600  # Delete task results after 1 hour
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Fair task distribution
 
+# Under DEBUG there is no broker to talk to, so run tasks inline in the calling
+# process. This is what makes signup, verification and the order emails
+# exercisable locally with no Redis and no Celery worker.
+CELERY_TASK_ALWAYS_EAGER = DEBUG
+CELERY_TASK_EAGER_PROPAGATES = DEBUG
+
 # Celery Beat Schedule
-from celery.schedules import crontab
+from celery.schedules import crontab  # noqa: E402
 CELERY_BEAT_SCHEDULE = {
     'register-daily-pickup': {
         'task': 'shipping.tasks.register_daily_pickup',
@@ -276,6 +407,15 @@ CELERY_BEAT_SCHEDULE = {
     'poll-active-shipments': {
         'task': 'shipping.tasks.poll_active_shipments',
         'schedule': crontab(minute=0, hour='*/2'),  # Every 2 hours
+    },
+    # Resolves prepaid orders whose outcome never reached us — an abandoned PhonePe page or a
+    # lost S2S callback. Without this nothing ever moves a stranded PENDING order, so the
+    # customer's stock stays held and they are never told what happened.
+    # NOTE: this entry is inert unless celery-beat is actually running. There is currently no
+    # lefoyer-celerybeat.service on the host — see docs/DEPLOYMENT.md.
+    'sweep-pending-orders': {
+        'task': 'orders.tasks.sweep_pending_orders',
+        'schedule': crontab(minute='*/5'),
     },
 }
 
@@ -305,7 +445,7 @@ BLUEDART_RETURN_CONTACT = os.getenv('BLUEDART_RETURN_CONTACT', 'Returns Desk')
 BLUEDART_RETURN_PHONE = os.getenv('BLUEDART_RETURN_PHONE', BLUEDART_WAREHOUSE_PHONE)
 
 # Environment
-BLUEDART_DEMO_MODE = os.getenv('BLUEDART_DEMO_MODE', 'True').lower() == 'true'
+BLUEDART_DEMO_MODE = env_bool('BLUEDART_DEMO_MODE', default=True)
 BLUEDART_TRACKING_POLL_INTERVAL = 120  # minutes
 
 # Default product settings for beauty products (lightweight parcels)
@@ -316,4 +456,3 @@ BLUEDART_DEFAULT_WEIGHT_KG = float(os.getenv('BLUEDART_DEFAULT_WEIGHT_KG', '0.5'
 BLUEDART_DEFAULT_LENGTH_CM = float(os.getenv('BLUEDART_DEFAULT_LENGTH_CM', '20'))
 BLUEDART_DEFAULT_WIDTH_CM = float(os.getenv('BLUEDART_DEFAULT_WIDTH_CM', '15'))
 BLUEDART_DEFAULT_HEIGHT_CM = float(os.getenv('BLUEDART_DEFAULT_HEIGHT_CM', '10'))
-

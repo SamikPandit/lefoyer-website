@@ -2,13 +2,63 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Le foyeR.</title>
-    <!-- Luxury Beauty Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Meta Pixel Code -->
+
+    <!-- viewport-fit=cover is REQUIRED: without it every env(safe-area-inset-*)
+         in the "Counter" design system resolves to 0 on notched devices. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FDFBF9" />
+    <meta name="color-scheme" content="only light" />
+
+    <!-- ========================================================================
+         SEO / social. These are the DOCUMENT defaults (i.e. the homepage).
+         Per-route title/description/canonical are overridden at runtime by
+         components/common/SeoHead.jsx via react-helmet-async.
+         Copy here is restricted to the IMPL_SPEC §4 safe defaults — nothing
+         unsubstantiated ("India's First", "clinically tested", "100% natural")
+         appears anywhere on this page.
+         ===================================================================== -->
+    <title>Le foyeR. — Skincare that feels like coming home.</title>
+    <meta name="description" content="Made in India. Dermatologist-tested formulations for the whole family — one shelf, every skin. Free standard delivery in 3-7 days and 7-day returns." />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://lefoyerglobal.com/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Le foyeR." />
+    <meta property="og:title" content="Le foyeR. — Skincare that feels like coming home." />
+    <meta property="og:description" content="Made in India. Dermatologist-tested formulations for the whole family — one shelf, every skin." />
+    <meta property="og:url" content="https://lefoyerglobal.com/" />
+    <meta property="og:locale" content="en_IN" />
+    <!-- TODO(business): supply an approved 1200x630 social share image and add
+         <meta property="og:image"> + <meta name="twitter:image"> pointing at it.
+         The repo holds no logo, no hero art and no share card; the only images
+         present are product shots of 1.18-6.10 MB, which exceed what Facebook
+         and X will fetch. A broken og:image is worse than none, so none ships. -->
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Le foyeR. — Skincare that feels like coming home." />
+    <meta name="twitter:description" content="Made in India. Dermatologist-tested formulations for the whole family — one shelf, every skin." />
+
+    <!-- Inline SVG favicon: no icon file exists in public/, and a <link> to a
+         missing file is a guaranteed 404 on every page view. -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%2314110F'/%3E%3Cpath%20d='M11%208h3.4v12.6H21V24H11z'%20fill='%23C9A96E'/%3E%3C/svg%3E" />
+
+    <!-- ========================================================================
+         Fonts — exactly the three families theme.js declares, and nothing else.
+         Loaded here as a <link> only; the blocking @import was removed from
+         index.css because it serialises the font fetch behind the CSS parse.
+           Inter       400/500/600/700  — UI, body, every commerce string
+           Inter Tight 600/700          — display, h1-h4, priceLg
+           Fraunces    opsz 72, wght 600 — brand voice, 3 uses, 20px hard floor
+         ===================================================================== -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@600;700&family=Fraunces:opsz,wght@72,600&display=swap"
+    />
+
+    <!-- Meta Pixel Code — the ONE init on the site. App.jsx must not re-init it;
+         all events go through src/services/analytics.js. -->
     <script>
       !function(f,b,e,v,n,t,s)
       {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -20,10 +70,8 @@
       'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '4302094446724267');
       fbq('track', 'PageView');
-      </script>
-
-      <!-- End Meta Pixel Code -->
-  
+    </script>
+    <!-- End Meta Pixel Code -->
   </head>
   <body>
     <noscript>
@@ -32,12 +80,10 @@
         width="1"
         style="display:none"
         src="https://www.facebook.com/tr?id=4302094446724267&ev=PageView&noscript=1"
+        alt=""
       />
     </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
-  </html>
-
-
-
+</html>

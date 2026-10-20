@@ -1,8 +1,96 @@
+"""Development-only catalogue seeder.
+
+READ THIS BEFORE RUNNING IT ANYWHERE THAT MATTERS.
+
+This command used to open with an unconditional
+``Product.objects.all().delete()`` and then re-create all ten rows from the
+literals below. Three things made that dangerous:
+
+1. It deleted the whole catalogue with no flag, no confirmation and no DEBUG
+   check, so a mistyped command on a production shell wiped the catalogue.
+2. ``OrderItem.product`` cascaded, so deleting products also deleted order
+   history — and with it the evidence behind every "Verified Buyer" review.
+3. The commercial values in this file disagree with
+   ``backend/latest_products.json`` (see the banner below) and neither file is
+   the live database, so re-creating rows from here silently overwrote whatever
+   the business had actually set.
+
+It is now a non-destructive upsert keyed on SKU. It refuses to run outside
+DEBUG, the delete is behind ``--force``, and it never writes a product's price,
+merchandising flags, visibility or stock level to an existing row. See
+IMPL_SPEC §4 LF-19: the live database is authoritative, neither file is.
+"""
+
 import decimal
-from django.core.management.base import BaseCommand
-from django.utils.text import slugify
+
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from products.models import Category, SubCategory, Product
+from django.db.models import ProtectedError
+from django.utils.text import slugify
+
+from products.models import Category, Product, SubCategory
+
+# Fields this command will write to an EXISTING row: descriptive copy only.
+# `slug` is deliberately absent — changing it breaks every live product URL and
+# every inbound link.
+COPY_FIELDS = (
+    'name',
+    'description',
+    'key_benefits',
+    'key_features',
+    'ingredients',
+    'how_to_use',
+    'suitable_for',
+    'size',
+    'category',
+    'sub_category',
+)
+
+# Fields written ONLY when creating a brand-new row, never on update.
+# IMPL_SPEC §4 LF-19: no package in this change-set writes a price, an
+# is_featured/is_bestseller flag or a show_at_website value, because the
+# approved product master has not been supplied and the live database is the
+# only authority. `stock_quantity` is here for the same reason — it is live
+# inventory, not seed data.
+CREATE_ONLY_FIELDS = (
+    'slug',
+    'sku',
+    'price',
+    'stock_quantity',
+    'is_featured',
+    'is_bestseller',
+)
+
+# IMPL_SPEC §1 C-10, verified by reading both files. Printed on every run so
+# nobody treats either file as the master.
+PRICE_CONFLICT_BANNER = """
+================================================================================
+ CATALOGUE SOURCE CONFLICT — neither this file nor latest_products.json is
+ authoritative. The LIVE DATABASE is. (IMPL_SPEC §1 C-10, §4 LF-19)
+--------------------------------------------------------------------------------
+ PRICE disagreements (2 of 10 SKUs):
+   LF-SK-CL01  Spotless Face Wash    this file 349.00  vs  fixture 280.00
+   LF-SK-CL02  WhiteWave Face Wash   this file 399.00  vs  fixture 280.00
+   The other 8 SKUs agree.
+
+ is_featured disagreement:
+   this file marks 6 featured (CL01, CL02, SK-SE01, SK-MO01, HA-SC01, HA-SE01)
+   latest_products.json marks 2 featured (CL01, CL02 only)
+
+ show_at_website disagreement:
+   latest_products.json sets show_at_website=False on 8 of 10 SKUs — only
+   Spotless Face Wash and WhiteWave Face Wash are visible in that fixture.
+
+ CONSEQUENCE: this command writes price, is_featured, is_bestseller,
+ show_at_website and stock_quantity ONLY when it creates a row that does not
+ exist yet. On an existing SKU it updates descriptive copy and nothing else.
+ TODO(business): supply the approved product master — per SKU, the selling
+ price, the show_at_website flag, the is_featured / is_bestseller /
+ display_order merchandising intent, and the approved description, benefits,
+ ingredients and suitability text that must match the marketplace listings.
+================================================================================
+"""
 
 # This is the main data structure containing all product information.
 # It's designed to be easily readable and maintainable.
@@ -249,70 +337,183 @@ PRODUCTS_DATA = [
 
 
 class Command(BaseCommand):
-    help = 'Seeds the database with initial product data for Le foyeR.'
+    help = (
+        'Development-only catalogue seeder. Non-destructive by default: upserts '
+        'the ten built-in SKUs by SKU, writing descriptive copy only. Refuses to '
+        'run unless DEBUG is True. Use --force to delete the existing catalogue '
+        'first (dangerous, see --help on that flag).'
+    )
 
-    @transaction.atomic
-    def handle(self, *args, **kwargs):
-        self.stdout.write('Deleting old product data...')
-        # Order of deletion is important due to foreign key constraints
-        Product.objects.all().delete()
-        SubCategory.objects.all().delete()
-        Category.objects.all().delete()
-        self.stdout.write(self.style.SUCCESS('Old data deleted.'))
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--force',
+            action='store_true',
+            help=(
+                'DESTRUCTIVE. Delete every Product, SubCategory and Category '
+                'before seeding. Without this flag the command only upserts.'
+            ),
+        )
+        parser.add_argument(
+            '--i-know-this-deletes-everything',
+            action='store_true',
+            dest='override_debug_guard',
+            help=(
+                'Permit the command to run while DEBUG is False. There is no '
+                'legitimate reason to do this on a box that serves customers.'
+            ),
+        )
+        parser.add_argument(
+            '--dry-run',
+            action='store_true',
+            help='Report what would change and roll back without writing.',
+        )
 
-        self.stdout.write('Creating new data...')
-        
-        products_created = 0
-        categories_created = 0
-        subcategories_created = 0
+    def handle(self, *args, **options):
+        force = options['force']
+        override = options['override_debug_guard']
+        dry_run = options['dry_run']
+
+        self.stdout.write(PRICE_CONFLICT_BANNER)
+
+        # ---- Guard 1: never run against a non-debug database by accident. ----
+        if not settings.DEBUG and not override:
+            raise CommandError(
+                'Refusing to run: DEBUG is False.\n'
+                'This command writes to the product catalogue and, with --force, '
+                'deletes it. The live catalogue is the authoritative source for '
+                'prices and merchandising (IMPL_SPEC §4 LF-19) and must not be '
+                'reseeded from the literals in this file.\n'
+                'If you genuinely intend to run it here, pass '
+                '--i-know-this-deletes-everything and take a database backup '
+                'first.'
+            )
+        if not settings.DEBUG and override:
+            self.stdout.write(self.style.WARNING(
+                'DEBUG is False and the guard was overridden explicitly. '
+                'Proceeding against a non-debug database.'
+            ))
+
+        try:
+            with transaction.atomic():
+                if force:
+                    self._destroy_catalogue()
+                else:
+                    self.stdout.write(
+                        'Running in upsert mode (no --force): nothing will be '
+                        'deleted.'
+                    )
+
+                created, updated = self._upsert_products()
+
+                self.stdout.write(self.style.SUCCESS(
+                    f'\nProducts created: {created}\n'
+                    f'Products updated (descriptive copy only): {updated}\n'
+                ))
+
+                if dry_run:
+                    raise _DryRunRollback()
+        except _DryRunRollback:
+            self.stdout.write(self.style.WARNING(
+                '--dry-run: all of the above was rolled back. Nothing was '
+                'written.'
+            ))
+
+    # ------------------------------------------------------------------ #
+
+    def _destroy_catalogue(self):
+        """The old unconditional delete, now behind --force and explained."""
+        product_count = Product.objects.count()
+        self.stdout.write(self.style.WARNING(
+            f'--force: deleting {product_count} product(s) and the whole '
+            f'category tree.'
+        ))
+        try:
+            # Order matters: products reference sub-categories, which reference
+            # categories.
+            Product.objects.all().delete()
+            SubCategory.objects.all().delete()
+            Category.objects.all().delete()
+        except ProtectedError as exc:
+            raise CommandError(
+                'Refusing to delete: at least one product is referenced by an '
+                'order line, which is protected so that order history and '
+                'verified-purchase evidence survive a catalogue edit.\n'
+                'Re-run without --force to upsert instead.\n'
+                f'Protected objects: {exc.protected_objects!r}'
+            ) from exc
+        self.stdout.write(self.style.SUCCESS('Old catalogue deleted.'))
+
+    def _upsert_products(self):
+        created = 0
+        updated = 0
 
         for data in PRODUCTS_DATA:
-            # Get or create the Category
-            category_obj, created = Category.objects.get_or_create(
+            category_obj, _ = Category.objects.get_or_create(
                 name=data['category'],
-                defaults={'slug': slugify(data['category'])}
+                defaults={'slug': slugify(data['category'])},
             )
-            if created:
-                categories_created += 1
-
-            # Get or create the SubCategory, linking it to the Category
-            subcategory_obj, created = SubCategory.objects.get_or_create(
+            subcategory_obj, _ = SubCategory.objects.get_or_create(
                 name=data['sub_category'],
                 defaults={
                     'slug': slugify(data['sub_category']),
-                    'category': category_obj
+                    'category': category_obj,
+                },
+            )
+
+            copy_values = {
+                'name': data['name'],
+                'description': data['description'],
+                'key_benefits': data['key_benefits'],
+                'key_features': data['key_features'],
+                'ingredients': data['ingredients'],
+                'how_to_use': data['how_to_use'],
+                'suitable_for': data['suitable_for'],
+                'size': data['size'],
+                'category': category_obj,
+                'sub_category': subcategory_obj,
+            }
+            assert set(copy_values) == set(COPY_FIELDS)
+
+            existing = Product.objects.filter(sku=data['sku']).first()
+
+            if existing is None:
+                # A brand-new row needs the commercial fields: price is NOT
+                # NULL and a product with no price cannot exist. These values
+                # are seed data for a development database only.
+                create_values = {
+                    'slug': slugify(data['name']),
+                    'sku': data['sku'],
+                    'price': decimal.Decimal(data['price']),
+                    'stock_quantity': data['stock_quantity'],
+                    'is_featured': data['is_featured'],
+                    'is_bestseller': data['is_bestseller'],
                 }
-            )
-            if created:
-                subcategories_created += 1
+                assert set(create_values) == set(CREATE_ONLY_FIELDS)
+                # Image fields are intentionally left blank: seeding images
+                # needs real files and is done by hand.
+                Product.objects.create(**create_values, **copy_values)
+                created += 1
+                self.stdout.write(
+                    f"  created  {data['sku']:<12} {data['name']}"
+                )
+            else:
+                for field, value in copy_values.items():
+                    setattr(existing, field, value)
+                # 'updated_at' is auto_now; without it in update_fields
+                # the timestamp would not advance.
+                existing.save(
+                    update_fields=list(copy_values.keys()) + ['updated_at']
+                )
+                updated += 1
+                self.stdout.write(
+                    f"  updated  {data['sku']:<12} {data['name']}  "
+                    f"(price {existing.price}, is_featured "
+                    f"{existing.is_featured}, show_at_website "
+                    f"{existing.show_at_website} left untouched)"
+                )
 
-            # Create the Product
-            Product.objects.create(
-                name=data['name'],
-                slug=slugify(data['name']),
-                category=category_obj,
-                sub_category=subcategory_obj,
-                price=decimal.Decimal(data['price']),
-                description=data['description'],
-                key_benefits=data['key_benefits'],
-                key_features=data['key_features'],
-                ingredients=data['ingredients'],
-                how_to_use=data['how_to_use'],
-                suitable_for=data['suitable_for'],
-                size=data['size'],
-                sku=data['sku'],
-                stock_quantity=data['stock_quantity'],
-                is_featured=data['is_featured'],
-                is_bestseller=data['is_bestseller'],
-                # NOTE: Image fields are intentionally left blank.
-                # Seeding images requires actual image files and is typically
-                # handled manually or via a more complex script.
-            )
-            products_created += 1
+        return created, updated
 
-        self.stdout.write(self.style.SUCCESS(
-            f'\nSuccessfully seeded database!\n'
-            f'- Categories created: {categories_created}\n'
-            f'- Sub-Categories created: {subcategories_created}\n'
-            f'- Products created: {products_created}\n'
-        ))
+
+class _DryRunRollback(Exception):
+    """Internal: unwinds the transaction for --dry-run."""
