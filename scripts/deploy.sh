@@ -149,6 +149,12 @@ rsh "set -e
   venv/bin/python manage.py migrate --noinput
   venv/bin/python manage.py collectstatic --noinput >/dev/null
   venv/bin/python manage.py recompute_product_ratings || echo '    (rating recompute skipped)'
+  # Responsive derivatives for UPLOADED media. The frontend's Vite pipeline can only pre-encode
+  # masters committed to the repo, which covers two of six live products; the other four are
+  # uploads in MEDIA_ROOT and were 2.27 MB of the listing's weight on their own. Incremental, so
+  # a deploy with no new uploads re-encodes nothing. Never fatal: without it the API returns
+  # image_main_derived=null and the client falls back to the original upload.
+  venv/bin/python manage.py optimize_media --quiet || echo '    (media optimisation skipped)'
   venv/bin/python manage.py check --deploy 2>&1 | tail -20 || true"
 
 # ---------------------------------------------------------------------------
