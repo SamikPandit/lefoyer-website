@@ -27,9 +27,16 @@
  * conflicting promises, and the one that matches what the backend actually
  * charges (nothing). `policy.js` carries the TODO(business) that must be answered
  * as a single set before these can be called final.
+ *
+ * §5.9 ARCHETYPE NOTE: the table names About, Contact, Help and the 404 as EDITORIAL and
+ * the seven transactional routes as UTILITY; the three legal pages are in neither list.
+ * They are long-form prose under one `h1` at a reading measure, which is what EDITORIAL
+ * describes, so they take EDITORIAL — the `variant="h1"` title they already used, left
+ * now, on `py: var(--lf-sect-lg)` from `<PageShell>` instead of a fifth bespoke `py`
+ * pair. Reported as an ambiguity rather than decided silently.
  */
 
-import { Box, Container, Divider, Link as MuiLink, Stack, Typography } from '@mui/material';
+import { Box, Divider, Link as MuiLink, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 import AssignmentReturnOutlinedIcon from '@mui/icons-material/AssignmentReturnOutlined';
@@ -37,7 +44,7 @@ import CurrencyRupeeOutlinedIcon from '@mui/icons-material/CurrencyRupeeOutlined
 
 import SeoHead from '../components/common/SeoHead';
 import SupportLink, { supportContactPath } from '../components/common/SupportLink';
-import { FOCUS_RING_SX } from '../components/common/EmptyState';
+import { FOCUS_RING_SX, PageShell, TOUCH_TARGET_SX } from '../components/common/EmptyState';
 import { usePolicy } from '../content/policy';
 import { useBrand } from '../content/brand';
 
@@ -100,46 +107,43 @@ const ShippingPolicy = () => {
         canonical="/shipping-returns"
       />
 
-      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 6, md: 10 } }}>
-        <Container maxWidth="md">
-          <Box sx={{ textAlign: 'center', mb: { xs: 5, md: 7 } }}>
-            <Typography variant="h1" component="h1" sx={{ color: 'var(--lf-ink)', mb: 2 }}>
-              Delivery, returns &amp; refunds
-            </Typography>
-            <Typography variant="subtitle1" sx={{ color: 'var(--lf-ink-2)' }}>
-              Three sections, one set of numbers. The same ones you see on a product
-              page, in your bag and at checkout.
-            </Typography>
-            {/* In-page nav, because this page is linked to from the PDP, the cart,
-                the order pages and the FAQ with a specific question in mind. */}
-            <Stack
-              direction="row"
-              spacing={2}
-              justifyContent="center"
-              flexWrap="wrap"
-              sx={{ mt: 3, rowGap: 1 }}
-            >
-              {[
-                ['#delivery', 'Delivery'],
-                ['#returns', 'Returns'],
-                ['#refunds', 'Refunds'],
-              ].map(([href, label]) => (
-                <MuiLink
-                  key={href}
-                  href={href}
-                  underline="always"
-                  sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}
-                >
-                  {label}
-                </MuiLink>
-              ))}
-            </Stack>
-          </Box>
-
+      <PageShell
+        archetype="editorial"
+        maxWidth="md"
+        title={<>Delivery, returns &amp; refunds</>}
+        intro="Three sections, one set of numbers. The same ones you see on a product page, in your bag and at checkout."
+        headerActions={
+          /* In-page nav, because this page is linked to from the PDP, the cart,
+             the order pages and Help with a specific question in mind. */
+          <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ rowGap: 1 }}>
+            {[
+              ['#delivery', 'Delivery'],
+              ['#returns', 'Returns'],
+              ['#refunds', 'Refunds'],
+            ].map(([href, label]) => (
+              <MuiLink
+                key={href}
+                href={href}
+                underline="always"
+                sx={{
+                  color: 'var(--lf-gold-ink)',
+                  fontWeight: 500,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  ...TOUCH_TARGET_SX,
+                  ...FOCUS_RING_SX,
+                }}
+              >
+                {label}
+              </MuiLink>
+            ))}
+          </Stack>
+        }
+      >
           <Box
             sx={{
               p: { xs: 3, md: 5 },
-              backgroundColor: 'var(--lf-surface)',
+              backgroundColor: 'var(--lf-paper)',
               border: '1px solid var(--lf-hairline)',
               borderRadius: 'var(--lf-r-panel)',
             }}
@@ -269,18 +273,21 @@ const ShippingPolicy = () => {
             </Section>
           </Box>
 
-          <Box sx={{ mt: 4, textAlign: 'center' }}>
+          <Box sx={{ mt: 4 }}>
             <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)' }}>
-              Still unsure? The{' '}
-              <Box component={RouterLink} to="/faq" sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}>
-                FAQ
+              Still unsure?{' '}
+              <Box
+                component={RouterLink}
+                to="/faq"
+                sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}
+              >
+                Help
               </Box>{' '}
               answers the common ones, and a person reads every message sent through{' '}
               <SupportLink variant="inline" label="our contact form" topic="delivery" />.
             </Typography>
           </Box>
-        </Container>
-      </Box>
+      </PageShell>
     </>
   );
 };

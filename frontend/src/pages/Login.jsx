@@ -51,7 +51,7 @@ import Typography from '@mui/material/Typography';
 
 import SeoHead from '../components/common/SeoHead';
 import CheckYourInbox, { AuthPanel } from '../components/auth/CheckYourInbox';
-import { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../components/common/EmptyState';
+import { FOCUS_RING_SX, PRIMARY_ACTION_SX, TOUCH_TARGET_SX } from '../components/common/EmptyState';
 import { useAuth } from '../context/AuthContext';
 
 /** localStorage key for the "Remember me" address. Per-device, never a token. */
@@ -271,7 +271,7 @@ const Login = () => {
             color="primary"
             disableElevation
             aria-disabled={loading}
-            sx={{ mt: 3, py: 1.5, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+            sx={{ mt: 3, ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : null}
           >
             {loading ? 'Signing in…' : 'Sign in'}

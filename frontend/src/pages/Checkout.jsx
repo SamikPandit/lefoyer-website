@@ -26,6 +26,35 @@
  * Layout follows DESIGN_SYSTEM §8: one page, three numbered sections, all
  * mounted, so nothing typed is ever lost and the total is never hidden behind a
  * step. The 3-step `Stepper` is gone.
+ *
+ * ALCOVE (ART_DIRECTION.md §5.5, §5.9) — PRESENTATION ONLY. Not one line of
+ * the payment state machine, the idempotency key, the coupon call or the retry
+ * path is touched; every change below is layout, token or copy placement.
+ *
+ *  1. **The duplicated totals stack is deleted.** The review panel used to
+ *     render Subtotal / Discount / Shipping / Total payable with byte-for-byte
+ *     the same server-priced figures as the sticky `<CartTotals>` beside it, in
+ *     a different type treatment. **Two "Total" blocks on one screen is a trust
+ *     defect** (§5.5). The review panel now keeps only `Delivering to` and the
+ *     line items; `<CartTotals>` is the ONE money block (§6.3).
+ *  2. **The coupon field moves into review section 3, above the CTA** (§5.5).
+ *     It lived in the summary column, which is the second grid child, so at
+ *     `xs` it stacked BELOW `Place Order` — the shopper was offered a discount
+ *     field after pressing the button that charges them.
+ *  3. **The grid children carry explicit `order`.** At `xs` the summary comes
+ *     first and the form follows, so nothing that belongs to the decision
+ *     renders after the CTA. At `md` and up the order is unchanged: form left,
+ *     sticky summary right.
+ *  4. **A sticky bottom pay bar at `xs`** carrying the total and Pay, with
+ *     `padding-bottom: max(16px, env(safe-area-inset-bottom))` so the amount
+ *     never scrolls away on a phone. It calls the SAME `handlePlaceOrder` under
+ *     the same `placing` guard and the same per-session `Idempotency-Key`, so a
+ *     press on either button is the same single order.
+ *     (`index.html` already ships `viewport-fit=cover`, without which every
+ *     `env()` in this system resolves to 0.)
+ *  5. Panels carry no shadow and no `--lf-e-edge` inset highlight (§3.11), the
+ *     UTILITY archetype sets the page rhythm (§5.9), and the trust row — the
+ *     lock plus `Payments handled by PhonePe` — is kept exactly as it was.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -151,9 +180,15 @@ function newIdempotencyKey() {
   return `lf-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+/* --lf-gold-ink on --lf-gold-tint measures 5.26:1 (§3.3). The number is
+   decorative — the heading beside it carries the meaning — so it is
+   aria-hidden, and its size comes from the `caption` variant rather than a
+   raw rem (§10.20). */
 const SectionHeading = ({ index, title, id, children }) => (
   <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2.5 }}>
-    <Box
+    <Typography
+      variant="caption"
+      component="span"
       aria-hidden="true"
       sx={{
         width: 28,
@@ -165,12 +200,11 @@ const SectionHeading = ({ index, title, id, children }) => (
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontWeight: 700,
-        fontSize: '0.875rem',
+        fontWeight: 600,
       }}
     >
       {index}
-    </Box>
+    </Typography>
     <Typography id={id} variant="h5" component="h2" sx={{ flexGrow: 1 }}>
       {title}
     </Typography>
@@ -178,14 +212,14 @@ const SectionHeading = ({ index, title, id, children }) => (
   </Stack>
 );
 
+/* §3.11 — ONE elevation ramp, and a panel is not a floating thing. */
 const Panel = ({ children, sx, ...rest }) => (
   <Box
     sx={{
       p: { xs: 2, md: 3 },
       borderRadius: 'var(--lf-r-panel)',
       border: '1px solid var(--lf-hairline)',
-      backgroundColor: 'var(--lf-surface)',
-      boxShadow: 'var(--lf-e-edge), var(--lf-e1)',
+      backgroundColor: 'var(--lf-paper)',
       ...sx,
     }}
     {...rest}
@@ -193,6 +227,10 @@ const Panel = ({ children, sx, ...rest }) => (
     {children}
   </Box>
 );
+
+/** The height of the `xs` pay bar (§5.5), mirrored into `--lf-bar-h` so the
+ *  toast and anything else anchored to the viewport bottom clears it. */
+const MOBILE_BAR_H = 76;
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -313,6 +351,16 @@ const Checkout = () => {
       cancelled = true;
     };
   }, [user]);
+
+  /* ---------------- the xs pay bar's own height ----------------
+     One attribute on <html>, set while this page is mounted, so the toast and
+     anything else anchored to the viewport bottom clears the bar. Exactly the
+     pattern the PDP's mobile buy bar uses — no component knows about it. */
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--lf-bar-h', `${MOBILE_BAR_H}px`);
+    return () => root.style.setProperty('--lf-bar-h', '0px');
+  }, []);
 
   /* ---------------- serviceability ---------------- */
   /* A real check on a valid pincode. `serviceable:false` blocks the order
@@ -576,17 +624,49 @@ const Checkout = () => {
   }
 
   const lines = summary ? summary.lines : [];
-  const blocked =
-    notServiceable || lines.length === 0 || lines.some((line) => !line.inStock);
+  const unavailableLine = lines.some((line) => !line.inStock);
+  const blocked = notServiceable || lines.length === 0 || unavailableLine;
   const disableSubmit = placing || blocked || summaryLoading || Boolean(strandedOrder);
 
-  const couponCode =
-    summary?.coupon && summary.coupon.applied && summary.coupon.valid
-      ? summary.coupon.code
-      : null;
+  /* One label, one reason, rendered by BOTH the inline CTA and the `xs` pay
+     bar — so the two buttons can never say different things about the same
+     order. Neither derives any money of its own: both print the server's
+     `summary.total` through the one formatter. */
+  const placeOrderLabel = placing
+    ? 'Placing your order…'
+    : !summary
+      ? 'Place order'
+      : paymentMethod === 'COD'
+        ? `Place order · ${formatMoney(summary.total)}`
+        : `Pay ${formatMoney(summary.total)}`;
+
+  const blockedReason = placing
+    ? null
+    : notServiceable
+      ? `We do not deliver to ${values.pincode} yet.`
+      : unavailableLine
+        ? 'Remove the unavailable items from your bag to continue.'
+        : lines.length === 0
+          ? 'Your bag is empty.'
+          : strandedOrder
+            ? 'Finish the payment for the order above — do not place a second one.'
+            : summaryLoading
+              ? 'Working out your total…'
+              : null;
 
   return (
-    <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 4, md: 6 } }}>
+    <Box
+      sx={{
+        backgroundColor: 'var(--lf-canvas)',
+        /* §5.9 UTILITY rhythm, plus room for the `xs` pay bar so it never
+           covers the terms line it sits under. */
+        pt: 'var(--lf-sect)',
+        pb: {
+          xs: `calc(var(--lf-sect) + ${MOBILE_BAR_H}px + env(safe-area-inset-bottom, 0px))`,
+          md: 'var(--lf-sect)',
+        },
+      }}
+    >
       <SeoHead title="Checkout" noindex description="Complete your order." />
       <Container maxWidth="lg">
         <Stack
@@ -611,7 +691,7 @@ const Checkout = () => {
             severity="error"
             sx={{ mb: 3 }}
             action={
-              <Button size="small" variant="outlined" onClick={refreshSummary}>
+              <Button variant="outlined" onClick={refreshSummary}>
                 Retry
               </Button>
             }
@@ -634,11 +714,12 @@ const Checkout = () => {
               second order — finish this one.
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-              <Button size="small" onClick={handleRetryStranded} disabled={placing}>
+              {/* A6: no `size="small"` — the theme's small button is 36px,
+                  below the 44px floor, and this is a recovery action. */}
+              <Button onClick={handleRetryStranded} disabled={placing}>
                 {placing ? 'Working…' : 'Retry payment'}
               </Button>
               <Button
-                size="small"
                 variant="outlined"
                 component={RouterLink}
                 to={`/orders/${strandedOrder.id}`}
@@ -647,7 +728,6 @@ const Checkout = () => {
               </Button>
               <SupportLink
                 variant="button"
-                size="small"
                 orderNumber={strandedOrder.order_number}
                 topic="payment"
               />
@@ -669,7 +749,7 @@ const Checkout = () => {
                 </li>
               ))}
             </Box>
-            <Button size="small" variant="outlined" component={RouterLink} to="/cart">
+            <Button variant="outlined" component={RouterLink} to="/cart">
               Edit your bag
             </Button>
           </Alert>
@@ -682,7 +762,7 @@ const Checkout = () => {
         )}
 
         <Grid container spacing={{ xs: 3, md: 4 }}>
-          <Grid size={{ xs: 12, md: 8 }}>
+          <Grid size={{ xs: 12, md: 8 }} sx={{ order: { xs: 2, md: 1 } }}>
             <Stack spacing={3}>
               {/* ---------------- 1. address ---------------- */}
               <Panel component="section" aria-labelledby="checkout-address">
@@ -752,11 +832,12 @@ const Checkout = () => {
               <Panel component="section" aria-labelledby="checkout-payment">
                 <SectionHeading index={2} id="checkout-payment" title="Payment method" />
                 <FormControl component="fieldset" sx={{ width: '100%' }}>
-                  <FormLabel
-                    component="legend"
-                    sx={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--lf-ink)', mb: 1 }}
-                  >
-                    How would you like to pay?
+                  {/* The <legend> is the fieldset's accessible name and stays
+                      exactly where it was; only the raw rem is gone. */}
+                  <FormLabel component="legend" sx={{ mb: 1 }}>
+                    <Typography variant="subtitle2" component="span" sx={{ color: 'var(--lf-ink)' }}>
+                      How would you like to pay?
+                    </Typography>
                   </FormLabel>
                   <RadioGroup
                     name="payment_method"
@@ -805,7 +886,8 @@ const Checkout = () => {
               <Panel component="section" aria-labelledby="checkout-review">
                 <SectionHeading index={3} id="checkout-review" title="Review and place your order" />
 
-                <Typography variant="overline" sx={{ color: 'var(--lf-ink-3)' }}>
+                {/* §3.7 — `eyebrow` replaces the deprecated `overline`. */}
+                <Typography variant="eyebrow" component="p" sx={{ color: 'var(--lf-gold-ink)' }}>
                   Delivering to
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 0.5 }}>
@@ -848,67 +930,52 @@ const Checkout = () => {
                   ))}
                 </Stack>
 
-                <Divider sx={{ my: 2 }} />
+                <Divider sx={{ my: 2.5 }} />
 
-                {/* The same server-priced figures as the summary panel. */}
-                <Stack spacing={1}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
-                      Subtotal
-                    </Typography>
-                    <Typography variant="body2" data-tnum="true">
-                      {formatMoney(summary?.subtotal)}
-                    </Typography>
-                  </Box>
-                  {Number(summary?.discountAmount) > 0 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" sx={{ color: 'var(--lf-ok-ink)' }}>
-                        Discount{couponCode ? ` (${couponCode})` : ''}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        data-tnum="true"
-                        sx={{ color: 'var(--lf-ok-ink)' }}
-                      >
-                        −{formatMoney(summary.discountAmount)}
-                      </Typography>
-                    </Box>
-                  )}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
-                      Shipping
-                    </Typography>
-                    <Typography variant="body2" data-tnum="true">
-                      {summary?.shippingAmount === 0
-                        ? 'Free'
-                        : formatMoney(summary?.shippingAmount, { fallback: copy.shippingAmountLabel })}
-                    </Typography>
-                  </Box>
-                  <Divider />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="h6">Total payable</Typography>
-                    <Typography variant="price" data-tnum="true" sx={{ fontWeight: 700 }}>
-                      {formatMoney(summary?.total)}
-                    </Typography>
-                  </Box>
-                </Stack>
+                {/* §5.5 — the coupon lives HERE, above the CTA, not in the
+                    second grid child where `xs` stacked it underneath. */}
+                <CouponField
+                  appliedCode={appliedCode}
+                  discountAmount={summary?.discountAmount || 0}
+                  onApply={handleApplyCoupon}
+                  onRemove={() => {
+                    setAppliedCode(null);
+                    setCouponError(null);
+                    setCouponReason(null);
+                  }}
+                  applying={applyingCoupon}
+                  error={couponError}
+                  reason={couponReason}
+                />
 
+                {/* The one total on this page is <CartTotals>'. A second
+                    Subtotal/Discount/Shipping/Total payable stack used to sit
+                    here, carrying the identical figures in a different type
+                    treatment (§5.5). */}
                 <Button
                   size="large"
                   fullWidth
-                  sx={{ mt: 3 }}
+                  sx={{ mt: 2.5 }}
                   onClick={handlePlaceOrder}
                   disabled={disableSubmit}
-                  startIcon={placing ? <CircularProgress size={18} /> : null}
+                  aria-describedby={blockedReason ? 'checkout-cta-reason' : undefined}
+                  startIcon={placing ? <CircularProgress size={18} thickness={3.6} /> : null}
                 >
-                  {placing
-                    ? 'Placing your order…'
-                    : !summary
-                      ? 'Place order'
-                      : paymentMethod === 'COD'
-                        ? `Place order · ${formatMoney(summary.total)}`
-                        : `Pay ${formatMoney(summary.total)}`}
+                  {placeOrderLabel}
                 </Button>
+
+                {/* §10.12's other half: when the action is unavailable the
+                    REASON is stated adjacent, in words, rather than left to a
+                    grey fill. */}
+                {blockedReason && (
+                  <Typography
+                    id="checkout-cta-reason"
+                    variant="caption"
+                    sx={{ display: 'block', mt: 1, color: 'var(--lf-warn-ink)', fontWeight: 600 }}
+                  >
+                    {blockedReason}
+                  </Typography>
+                )}
 
                 <Typography
                   variant="caption"
@@ -928,7 +995,10 @@ const Checkout = () => {
             </Stack>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 4 }}>
+          {/* §5.5 — explicit `order`: at `xs` the money comes BEFORE the form
+              instead of after the button that charges for it. Unchanged from
+              `md` up: form left, sticky summary right. */}
+          <Grid size={{ xs: 12, md: 4 }} sx={{ order: { xs: 1, md: 2 } }}>
             <Box sx={{ position: { md: 'sticky' }, top: { md: 'calc(var(--lf-nav-h) + 24px)' } }}>
               <CartTotals
                 summary={summary}
@@ -939,7 +1009,7 @@ const Checkout = () => {
                     sx={{
                       p: 2,
                       borderRadius: 'var(--lf-r-field)',
-                      backgroundColor: 'var(--lf-surface-sunken)',
+                      backgroundColor: 'var(--lf-mat)',
                     }}
                   >
                     <Typography variant="caption" sx={{ color: 'var(--lf-ink-2)', display: 'block' }}>
@@ -951,29 +1021,68 @@ const Checkout = () => {
                   </Box>
                 }
               >
-                <Stack spacing={2}>
-                  <CouponField
-                    appliedCode={appliedCode}
-                    discountAmount={summary?.discountAmount || 0}
-                    onApply={handleApplyCoupon}
-                    onRemove={() => {
-                      setAppliedCode(null);
-                      setCouponError(null);
-                      setCouponReason(null);
-                    }}
-                    applying={applyingCoupon}
-                    error={couponError}
-                    reason={couponReason}
-                  />
-                  <Button variant="outlined" fullWidth component={RouterLink} to="/cart">
-                    Edit your bag
-                  </Button>
-                </Stack>
+                <Button variant="outlined" fullWidth component={RouterLink} to="/cart">
+                  Edit your bag
+                </Button>
               </CartTotals>
             </Box>
           </Grid>
         </Grid>
       </Container>
+
+      {/* ---------------- the xs pay bar (§5.5) ----------------
+          The amount never scrolls away on a phone. It is the SAME action under
+          the SAME `placing` guard and the SAME per-session Idempotency-Key as
+          the inline CTA, so pressing both cannot create two orders.
+          Its label is the short form of the inline CTA's and its amount is the
+          same `summary.total` through the same formatter, so the two buttons
+          cannot disagree about what is being charged.
+          `.lf-glass` is legal here (§2.8/P6: nav and sticky bars only, never
+          inside a scrolling list), and nothing position:fixed nests inside the
+          blurred nav. */}
+      <Box
+        className="lf-glass"
+        sx={{
+          display: { xs: 'flex', md: 'none' },
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 'appBar',
+          alignItems: 'center',
+          gap: 2,
+          px: 'var(--lf-gutter)',
+          pt: 'var(--lf-2)',
+          /* §5.5 verbatim — and index.html already carries viewport-fit=cover,
+             without which every env() in this system resolves to 0. */
+          pb: 'max(var(--lf-4), env(safe-area-inset-bottom, 0px))',
+          borderTop: '1px solid var(--lf-hairline)',
+          boxShadow: 'var(--lf-e-bar)',
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="caption" component="p" sx={{ color: 'var(--lf-ink-3)' }}>
+            {paymentMethod === 'COD' ? 'To pay on delivery' : 'Total payable'}
+          </Typography>
+          <Typography
+            variant="price"
+            component="p"
+            data-tnum="true"
+            sx={{ color: 'var(--lf-ink)', whiteSpace: 'nowrap' }}
+          >
+            {summary ? formatMoney(summary.total) : '—'}
+          </Typography>
+        </Box>
+        <Button
+          sx={{ flexGrow: 1, minHeight: 48 }}
+          onClick={handlePlaceOrder}
+          disabled={disableSubmit}
+          aria-describedby={blockedReason ? 'checkout-cta-reason' : undefined}
+          startIcon={placing ? <CircularProgress size={18} thickness={3.6} /> : null}
+        >
+          {placing ? 'Placing…' : paymentMethod === 'COD' ? 'Place order' : 'Pay'}
+        </Button>
+      </Box>
     </Box>
   );
 };

@@ -1,35 +1,43 @@
 /**
- * SearchOverlay — the storefront's search. LF-09, IMPL_SPEC §1 C-14, §3 WP-08,
- * DESIGN_SYSTEM §6.6.
+ * ============================================================================
+ * <SearchOverlay> — ART_DIRECTION.md §5.10, §2.24. LF-09.
  *
- * WHAT WAS HERE BEFORE: nothing. `Navbar.jsx` rendered a bare
- * `<IconButton sx={{color:'inherit'}}><SearchIcon /></IconButton>` with no `onClick`,
- * no `href` and no `component`, sitting between two correctly wired `component={Link}`
- * icons. There was no search UI, no `/search` route handler and no code path anywhere
- * in the app that sent a term to the API. This file and `pages/Search.jsx` are it.
+ * TWO THINGS CHANGE HERE, AND BOTH ARE ABOUT SHOWING THE SHOP RATHER THAN
+ * HIDING IT.
+ *
+ * 1. `in_stock: true` IS DROPPED (§2.24). This file passed it while
+ *    `pages/Search.jsx` passed no such filter, so the SAME QUERY RETURNED TWO
+ *    DIFFERENT SHOPS depending on which surface you used — and since exactly
+ *    three of six products are out of stock, the overlay was hiding half the
+ *    catalogue from the person who had just typed its name. Out-of-stock rows
+ *    render with their stock words and the thing their page offers; §10.13
+ *    forbids dimming them, so they are not dimmed.
+ *
+ * 2. THE IDLE STATE IS THE SHELF (§5.10). It used to be one line of grey text
+ *    in a 60vh panel: a question asked of someone who had not decided yet.
+ *    Now opening search on an empty query SHOWS YOU THE SHOP — all six
+ *    products, in-stock first (§2.23), as the same rows a query returns, in
+ *    the same listbox, reachable with the same arrow keys. With six SKUs
+ *    there is no version of "browse" that is not simply the catalogue.
  *
  * REQUEST DISCIPLINE (the part that is easy to get wrong)
- * 300ms debounce, minimum two characters, and the in-flight request is **aborted**
- * through an `AbortController` — not merely ignored when it resolves. A discarded-but-
- * still-running request keeps a connection open per keystroke and, on the `catalogue`
- * throttle scope (300/min), is how a fast typist gets themselves a 429.
+ * 300ms debounce, minimum two characters, and the in-flight request is
+ * ABORTED through an `AbortController` — not merely ignored when it resolves.
+ * A discarded-but-still-running request keeps a connection open per keystroke
+ * and, on the `catalogue` throttle scope (300/min), is how a fast typist gets
+ * themselves a 429. The idle shelf is fetched at most once per page load and
+ * shares its promise with the footer's row, so the two surfaces that show the
+ * same six products do not fetch them twice.
  *
- * `searchProducts(q, {in_stock:true, page_size:6})` is `GET products/products/?search=`
- * — see services/api.js. The overlay shows sellable products only; the full
- * `/search` page shows everything that matches and labels its stock state.
+ * DEBOUNCE DISCREPANCY, STATED: DESIGN_SYSTEM §6.6 says 120ms, IMPL_SPEC §3
+ * WP-08 says 300ms. The package contract wins; the constant below is the only
+ * place to change it.
  *
- * DEBOUNCE DISCREPANCY, STATED: DESIGN_SYSTEM §6.6 says 120ms, IMPL_SPEC §3 WP-08 says
- * 300ms. The package contract wins; the constant below is the only place to change it.
- *
- * DATA-PATH DEPENDENCY, STATED: §6.6 was written when `products/views.py` had no
- * `SearchFilter`, and prescribes a client-side `searchIndex.js` cache as the interim.
- * Wave 1 put `SearchFilter` in `DEFAULT_FILTER_BACKENDS`, and WP-02 owns adding
- * `search_fields` to `ProductViewSet` (its acceptance: "`?search=serum` returns a
- * strict subset"). Until that lands, DRF's `SearchFilter` with no `search_fields`
- * returns the queryset untouched, so this overlay will show the whole catalogue for
- * any query. That is a backend gap, not a client one: the §6.6 upgrade path has
- * already been taken, and nothing in this component changes when it lands.
- */
+ * DATA-PATH DEPENDENCY, STATED: until `ProductViewSet` gains `search_fields`,
+ * DRF's `SearchFilter` returns the queryset untouched, so this overlay will
+ * show the whole catalogue for any query. That is a backend gap, not a client
+ * one, and nothing in this component changes when it lands.
+ * ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
@@ -40,7 +48,6 @@ import {
   Divider,
   IconButton,
   InputBase,
-  Skeleton,
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -48,16 +55,17 @@ import SearchIcon from '@mui/icons-material/Search';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 
 import { listConcerns, searchProducts } from '../../services/api';
-import EmptyState, { FOCUS_RING_SX } from '../common/EmptyState';
+import EmptyState from '../common/EmptyState';
+import { inStockFirst, loadShelfProducts } from '../common/Footer';
 import SearchResultRow, { productPath } from './SearchResultRow';
 
 /* The two numbers the package contract fixes. */
 export const SEARCH_DEBOUNCE_MS = 300;
 export const SEARCH_MIN_CHARS = 2;
 const OVERLAY_PAGE_SIZE = 6;
-/** Skeletons only after 220ms, so a fast response never flashes them (§6.4). */
+/** Skeletons only after 220ms, so a fast response never flashes them. */
 const SKELETON_AFTER_MS = 220;
-/** The result count is announced at most this often (§6.6). */
+/** The result count is announced at most this often. */
 const ANNOUNCE_THROTTLE_MS = 500;
 const LISTBOX_ID = 'lf-search-list';
 const ROW_ID = (index) => `lf-search-option-${index}`;
@@ -75,11 +83,12 @@ export const searchPagePath = (query) => `/search?q=${encodeURIComponent(query)}
  * Concern chips — the recovery path on a no-results state.
  * These are REAL rows from `GET products/concerns/`. A concern is never
  * invented here: if the request fails or returns nothing, no chips are
- * rendered at all (AGENT_BRIEF: "Never invent a concern").
+ * rendered at all.
  * ================================================================== */
 
 /**
  * Fetch the concern list once, lazily, while `enabled` is true.
+ * @param {boolean} enabled
  * @returns {Array<{id:number, name:string, slug:string}>}
  */
 export function useConcernChips(enabled) {
@@ -107,13 +116,14 @@ export function useConcernChips(enabled) {
 }
 
 /**
- * The no-results state. Shared verbatim by the overlay and `pages/Search.jsx` so the
- * two can never word the same dead end differently.
+ * The no-results state. Shared verbatim by the overlay and `pages/Search.jsx`
+ * so the two can never word the same dead end differently.
  *
  * @param {object} props
  * @param {string} props.query The term that matched nothing.
  * @param {Function} [props.onNavigate] Called when a recovery link is followed.
  * @param {'inline'|'page'} [props.variant='inline']
+ * @returns {JSX.Element}
  */
 export const SearchNoResults = ({ query, onNavigate, variant = 'inline' }) => {
   const concerns = useConcernChips(true);
@@ -131,21 +141,10 @@ export const SearchNoResults = ({ query, onNavigate, variant = 'inline' }) => {
     >
       {concerns.length > 0 && (
         <Box sx={{ mt: 1 }}>
-          <Typography
-            variant="overline"
-            component="p"
-            sx={{ color: 'var(--lf-ink-3)', mb: 1.5 }}
-          >
+          <Typography variant="eyebrow" component="p" sx={{ mb: 1.5 }}>
             Shop by concern
           </Typography>
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 1,
-              justifyContent: 'center',
-            }}
-          >
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
             {concerns.map((concern) => (
               <Chip
                 key={concern.slug}
@@ -156,7 +155,6 @@ export const SearchNoResults = ({ query, onNavigate, variant = 'inline' }) => {
                 label={concern.name}
                 to={`/products?concern=${encodeURIComponent(concern.slug)}`}
                 onClick={onNavigate}
-                sx={{ ...FOCUS_RING_SX, minHeight: 32 }}
               />
             ))}
           </Box>
@@ -170,14 +168,32 @@ export const SearchNoResults = ({ query, onNavigate, variant = 'inline' }) => {
  * The overlay
  * ================================================================== */
 
+/**
+ * A skeleton the shape of the real row (P5): a 72px niche, two text lines and
+ * a price. First paint and loaded paint are the same height, so nothing jumps
+ * when the results land.
+ */
 const RowSkeleton = () => (
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.25, minHeight: 64 }}>
-    <Skeleton variant="rounded" width={48} height={48} sx={{ borderRadius: 'var(--lf-r-chip)' }} />
-    <Box sx={{ flex: 1 }}>
-      <Skeleton variant="text" width="62%" height={16} />
-      <Skeleton variant="text" width="34%" height={12} />
+  <Box
+    aria-hidden="true"
+    sx={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 'var(--lf-4)',
+      px: { xs: 'var(--lf-3)', sm: 'var(--lf-4)' },
+      py: 'var(--lf-2)',
+      minHeight: 64,
+    }}
+  >
+    <Box
+      className="lf-skel lf-skel--alcove"
+      sx={{ flex: 'none', inlineSize: 'calc(72px / var(--lf-arch-ratio))' }}
+    />
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box className="lf-skel lf-skel--text" sx={{ height: 14, width: '62%' }} />
+      <Box className="lf-skel lf-skel--text" sx={{ height: 11, width: '34%', mt: 'var(--lf-2)' }} />
     </Box>
-    <Skeleton variant="text" width={56} height={16} />
+    <Box className="lf-skel lf-skel--text" sx={{ height: 16, width: 56 }} />
   </Box>
 );
 
@@ -187,6 +203,7 @@ const RowSkeleton = () => (
  * @param {Function} props.onClose Called for Esc, the scrim, the close button and
  *   after any navigation out of the overlay. Focus returns to the trigger because
  *   MUI's Modal restores it — do not pass `disableRestoreFocus`.
+ * @returns {JSX.Element}
  */
 const SearchOverlay = ({ open, onClose }) => {
   const navigate = useNavigate();
@@ -202,10 +219,24 @@ const SearchOverlay = ({ open, onClose }) => {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [showSkeleton, setShowSkeleton] = useState(false);
   const [announcement, setAnnouncement] = useState('');
+  /** §5.10's idle shelf: `null` until the six products land. */
+  const [shelf, setShelf] = useState(null);
 
   const trimmed = query.trim();
   const tooShort = trimmed.length > 0 && trimmed.length < SEARCH_MIN_CHARS;
   const hasQuery = trimmed.length >= SEARCH_MIN_CHARS;
+
+  /* ---- §5.10: the shelf, fetched once, the first time search opens ----- */
+  useEffect(() => {
+    if (!open || shelf !== null) return undefined;
+    let alive = true;
+    loadShelfProducts().then((products) => {
+      if (alive) setShelf(inStockFirst(products));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [open, shelf]);
 
   /* ---- the search itself: debounce + abort ------------------------ */
   useEffect(() => {
@@ -228,15 +259,17 @@ const SearchOverlay = ({ open, onClose }) => {
       abortRef.current = controller;
       setStatus('loading');
 
+      /* NO `in_stock` FILTER (§2.24). The overlay and /search are the same
+         shop, and half this catalogue is out of stock today. */
       searchProducts(
         trimmed,
-        { in_stock: true, page_size: OVERLAY_PAGE_SIZE },
+        { page_size: OVERLAY_PAGE_SIZE },
         { signal: controller.signal }
       )
         .then((result) => {
           if (controller.signal.aborted) return;
           const list = Array.isArray(result?.items) ? result.items : [];
-          setItems(list);
+          setItems(inStockFirst(list));
           setCount(typeof result?.count === 'number' ? result.count : list.length);
           setActiveIndex(-1);
           setStatus('done');
@@ -316,7 +349,16 @@ const SearchOverlay = ({ open, onClose }) => {
     close();
   }, [close, hasQuery, navigate, trimmed]);
 
-  /* ---- keyboard contract (§6.6) ----------------------------------- */
+  /* The listbox's contents: the matches, or — on an empty query — the shelf.
+     ONE list, so the arrow keys, `aria-activedescendant` and Enter behave
+     identically whether the shopper has typed anything or not. */
+  const shelfRows = shelf || [];
+  const rows = hasQuery ? items : shelfRows;
+  const showRows = hasQuery ? status === 'done' && items.length > 0 : shelfRows.length > 0;
+  const showEmpty = status === 'done' && items.length === 0 && hasQuery;
+  const showShelfSkeleton = !hasQuery && shelf === null;
+
+  /* ---- keyboard contract ------------------------------------------ */
   const handleKeyDown = (event) => {
     if (event.key === 'Escape') {
       // First Esc clears a non-empty query; the second one closes.
@@ -329,7 +371,7 @@ const SearchOverlay = ({ open, onClose }) => {
       return;
     }
 
-    if (items.length === 0) {
+    if (rows.length === 0) {
       if (event.key === 'Enter' && hasQuery) {
         event.preventDefault();
         goToResultsPage();
@@ -339,35 +381,32 @@ const SearchOverlay = ({ open, onClose }) => {
 
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setActiveIndex((current) => (current + 1 >= items.length ? 0 : current + 1));
+      setActiveIndex((current) => (current + 1 >= rows.length ? 0 : current + 1));
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setActiveIndex((current) => (current <= 0 ? items.length - 1 : current - 1));
+      setActiveIndex((current) => (current <= 0 ? rows.length - 1 : current - 1));
     } else if (event.key === 'Home') {
       event.preventDefault();
       setActiveIndex(0);
     } else if (event.key === 'End') {
       event.preventDefault();
-      setActiveIndex(items.length - 1);
+      setActiveIndex(rows.length - 1);
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      const product = items[activeIndex];
+      const product = rows[activeIndex];
       if (product) {
         navigate(productPath(product));
         close();
-      } else {
+      } else if (hasQuery) {
         goToResultsPage();
       }
     }
   };
 
   const activeDescendant = useMemo(
-    () => (activeIndex >= 0 && items[activeIndex] ? ROW_ID(activeIndex) : undefined),
-    [activeIndex, items]
+    () => (activeIndex >= 0 && rows[activeIndex] ? ROW_ID(activeIndex) : undefined),
+    [activeIndex, rows]
   );
-
-  const showResults = status === 'done' && items.length > 0;
-  const showEmpty = status === 'done' && items.length === 0 && hasQuery;
 
   return (
     <Dialog
@@ -400,176 +439,200 @@ const SearchOverlay = ({ open, onClose }) => {
           does not consult `defaultPrevented`, so the only way to swallow the first
           Escape (which clears the query) is to stop it propagating from inside. */}
       <Box onKeyDown={handleKeyDown}>
-      {/* ---- the field ---- */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          px: { xs: 1.5, sm: 2 },
-          py: 1.5,
-        }}
-      >
-        <SearchIcon aria-hidden="true" sx={{ color: 'var(--lf-ink-3)' }} />
-        <InputBase
-          inputRef={inputRef}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search products"
-          inputProps={{
-            'aria-label': 'Search products',
-            role: 'combobox',
-            'aria-expanded': showResults,
-            'aria-controls': LISTBOX_ID,
-            'aria-autocomplete': 'list',
-            'aria-activedescendant': activeDescendant,
-            autoComplete: 'off',
-            autoCorrect: 'off',
-            spellCheck: 'false',
-            enterKeyHint: 'search',
-            type: 'search',
-          }}
+        {/* ---- the field ---- */}
+        <Box
           sx={{
-            flex: 1,
-            fontSize: '1.0625rem',
-            color: 'var(--lf-ink)',
-            '& input::-webkit-search-cancel-button': { display: 'none' },
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--lf-3)',
+            px: { xs: 'var(--lf-3)', sm: 'var(--lf-4)' },
+            py: 'var(--lf-3)',
           }}
-        />
-        <IconButton onClick={close} aria-label="Close search" sx={FOCUS_RING_SX}>
-          <CloseIcon />
-        </IconButton>
-      </Box>
-
-      <Divider />
-
-      {/* ---- results region ---- */}
-      <Box
-        className="lf-scroll"
-        sx={{
-          maxHeight: { xs: '62dvh', sm: '60vh' },
-          overflowY: 'auto',
-          overscrollBehavior: 'contain',
-          p: 1,
-          backgroundColor: 'var(--lf-surface)',
-        }}
-      >
-        <Box className="lf-sr-only" role="status" aria-live="polite">
-          {announcement}
+        >
+          <SearchIcon aria-hidden="true" sx={{ color: 'var(--lf-ink-3)' }} />
+          <InputBase
+            inputRef={inputRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search products"
+            inputProps={{
+              'aria-label': 'Search products',
+              role: 'combobox',
+              'aria-expanded': showRows,
+              'aria-controls': LISTBOX_ID,
+              'aria-autocomplete': 'list',
+              'aria-activedescendant': activeDescendant,
+              autoComplete: 'off',
+              autoCorrect: 'off',
+              spellCheck: 'false',
+              enterKeyHint: 'search',
+              type: 'search',
+            }}
+            sx={{
+              flex: 1,
+              fontSize: '1.0625rem',
+              color: 'var(--lf-ink)',
+              '& input::-webkit-search-cancel-button': { display: 'none' },
+              /* A7. Without this the field a keyboard user types into shows no
+                 focus at all: InputBase paints no ring of its own, and the
+                 overlay is reachable from the nav on every route. Scoped to the
+                 InputBase rather than :focus-within on the row, so it cannot
+                 double-ring with the adjacent close button. */
+              '&.Mui-focused': {
+                outline: '2px solid var(--lf-focus)',
+                outlineOffset: 2,
+                borderRadius: 'var(--lf-r-field)',
+              },
+            }}
+          />
+          <IconButton onClick={close} aria-label="Close search">
+            <CloseIcon />
+          </IconButton>
         </Box>
 
-        {status === 'idle' && (
-          <Typography
-            variant="body2"
-            sx={{ px: 2, py: 2.5, color: 'var(--lf-ink-3)' }}
-          >
-            {tooShort
-              ? `Keep typing — ${SEARCH_MIN_CHARS} characters minimum.`
-              : 'Search by product name, category or benefit.'}
-          </Typography>
-        )}
+        <Divider />
 
-        {status === 'loading' &&
-          (showSkeleton ? (
+        {/* ---- results region ---- */}
+        <Box
+          className="lf-scroll"
+          sx={{
+            maxHeight: { xs: '62dvh', sm: '60vh' },
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+            p: 'var(--lf-2)',
+          }}
+        >
+          <Box className="lf-sr-only" role="status" aria-live="polite">
+            {announcement}
+          </Box>
+
+          {/* One character typed: say what is missing, and keep the shelf
+              visible beneath it rather than replacing the shop with a hint. */}
+          {tooShort ? (
+            <Typography
+              variant="body2"
+              sx={{ px: 'var(--lf-4)', py: 'var(--lf-3)', color: 'var(--lf-ink-3)' }}
+            >
+              {`Keep typing — ${SEARCH_MIN_CHARS} characters minimum.`}
+            </Typography>
+          ) : null}
+
+          {/* §5.10 — the idle state is the whole shop, not a prompt. */}
+          {!hasQuery && showRows ? (
+            <Typography
+              variant="eyebrow"
+              component="p"
+              sx={{ px: 'var(--lf-4)', pt: 'var(--lf-2)', pb: 'var(--lf-1)' }}
+            >
+              The shelf
+            </Typography>
+          ) : null}
+
+          {showShelfSkeleton || (status === 'loading' && showSkeleton) ? (
             <Box aria-hidden="true">
               <RowSkeleton />
               <RowSkeleton />
               <RowSkeleton />
             </Box>
-          ) : null)}
+          ) : null}
 
-        {status === 'error' && (
-          <Box sx={{ px: 2, py: 2 }} role="alert">
-            <Typography variant="subtitle2" sx={{ color: 'var(--lf-ink)' }}>
-              Couldn&apos;t search right now
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)', mt: 0.5 }}>
-              This is a connection problem on our side, not an empty result. Try again
-              in a moment, or{' '}
-              <Box
-                component="button"
-                type="button"
-                onClick={() => {
-                  navigate('/products');
-                  close();
-                }}
-                sx={{
-                  background: 'none',
-                  border: 0,
-                  p: 0,
-                  font: 'inherit',
-                  color: 'var(--lf-gold-ink)',
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                  ...FOCUS_RING_SX,
-                }}
-              >
-                browse all products
-              </Box>
-              .
-            </Typography>
-          </Box>
-        )}
+          {status === 'error' && hasQuery && (
+            <Box sx={{ px: 'var(--lf-4)', py: 'var(--lf-4)' }} role="alert">
+              <Typography variant="h5" component="p" sx={{ color: 'var(--lf-ink)' }}>
+                Couldn&apos;t search right now
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)', mt: 0.5 }}>
+                This is a connection problem on our side, not an empty result. Try again
+                in a moment, or{' '}
+                <Box
+                  component="button"
+                  type="button"
+                  onClick={() => {
+                    navigate('/products');
+                    close();
+                  }}
+                  sx={{
+                    background: 'none',
+                    border: 0,
+                    p: 0,
+                    font: 'inherit',
+                    color: 'var(--lf-gold-ink)',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                  }}
+                >
+                  browse all products
+                </Box>
+                .
+              </Typography>
+            </Box>
+          )}
 
-        {showResults && (
-          <>
-            <Box id={LISTBOX_ID} role="listbox" aria-label={`Results for ${trimmed}`}>
-              {items.map((product, index) => (
+          {showRows && (
+            <Box
+              id={LISTBOX_ID}
+              role="listbox"
+              aria-label={hasQuery ? `Results for ${trimmed}` : 'All products'}
+            >
+              {rows.map((product, index) => (
                 <SearchResultRow
                   key={product.id ?? product.slug ?? index}
                   id={ROW_ID(index)}
                   product={product}
-                  query={trimmed}
+                  query={hasQuery ? trimmed : ''}
                   active={index === activeIndex}
                   onSelect={close}
                   onMouseEnter={() => setActiveIndex(index)}
                 />
               ))}
             </Box>
+          )}
 
-            <Divider sx={{ my: 1 }} />
-            <Box
-              component="button"
-              type="button"
-              onClick={goToResultsPage}
-              className="lf-press"
-              sx={{
-                width: '100%',
-                minHeight: 44,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                px: 2,
-                background: 'none',
-                border: 0,
-                borderRadius: 'var(--lf-r-field)',
-                cursor: 'pointer',
-                font: 'inherit',
-                color: 'var(--lf-ink)',
-                '@media (hover: hover)': {
-                  '&:hover': { backgroundColor: 'var(--lf-surface-sunken)' },
-                },
-                ...FOCUS_RING_SX,
-              }}
-            >
-              <Typography variant="subtitle2" component="span">
-                {count > items.length
-                  ? `See all ${count} results`
-                  : `See all results for “${trimmed}”`}
-              </Typography>
-              <Typography variant="caption" component="span" sx={{ color: 'var(--lf-ink-3)' }}>
-                Enter
-              </Typography>
+          {showRows && hasQuery && (
+            <>
+              <Divider sx={{ my: 'var(--lf-2)' }} />
+              <Box
+                component="button"
+                type="button"
+                onClick={goToResultsPage}
+                className="lf-press"
+                data-press="row"
+                sx={{
+                  width: '100%',
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  px: 'var(--lf-4)',
+                  background: 'none',
+                  border: 0,
+                  borderRadius: 'var(--lf-r-field)',
+                  cursor: 'pointer',
+                  font: 'inherit',
+                  color: 'var(--lf-ink)',
+                  '@media (hover: hover)': {
+                    '&:hover': { backgroundColor: 'var(--lf-mat)' },
+                  },
+                }}
+              >
+                <Typography variant="h5" component="span">
+                  {count > rows.length
+                    ? `See all ${count} results`
+                    : `See all results for “${trimmed}”`}
+                </Typography>
+                <Typography variant="caption" component="span" sx={{ color: 'var(--lf-ink-3)' }}>
+                  Enter
+                </Typography>
+              </Box>
+            </>
+          )}
+
+          {showEmpty && (
+            <Box sx={{ px: 'var(--lf-2)', py: 'var(--lf-2)' }}>
+              <SearchNoResults query={trimmed} onNavigate={close} />
             </Box>
-          </>
-        )}
-
-        {showEmpty && (
-          <Box sx={{ px: 1, py: 1 }}>
-            <SearchNoResults query={trimmed} onNavigate={close} />
-          </Box>
-        )}
-      </Box>
+          )}
+        </Box>
       </Box>
     </Dialog>
   );

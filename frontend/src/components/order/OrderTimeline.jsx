@@ -24,6 +24,12 @@
  * `order.status` is the server's DERIVED status (C-19: there is no `status`
  * column; both this file and OrderDetail read one and silently fell back to the
  * string 'Pending' for every order ever placed).
+ *
+ * ALCOVE: `--lf-surface-quiet` → `--lf-quiet` (§3.1 — the deprecated alias is
+ * deleted in step 9.10), the recovery buttons drop `size="small"` because the
+ * theme's small button is 36px and A6 sets a 44px floor on every target, and
+ * `--lf-ink-4` stays only where it already was: on an IDLE step's glyph, which
+ * is non-text and is the one role §3.2 keeps it for.
  */
 
 import Box from '@mui/material/Box';
@@ -112,7 +118,7 @@ const StepBubble = ({ Icon, state }) => {
     complete: { bg: 'var(--lf-ink)', fg: 'var(--lf-on-ink)' },
     active: { bg: 'var(--lf-gold-tint)', fg: 'var(--lf-gold-ink)' },
     error: { bg: 'var(--lf-err-tint)', fg: 'var(--lf-err-ink)' },
-    idle: { bg: 'var(--lf-surface-quiet)', fg: 'var(--lf-ink-4)' },
+    idle: { bg: 'var(--lf-quiet)', fg: 'var(--lf-ink-4)' },
   }[state];
 
   return (
@@ -271,7 +277,6 @@ const OrderTimeline = ({ order, onRetryPayment, onRestoreCart }) => {
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5 }}>
             {retryable && (
               <Button
-                size="small"
                 startIcon={<ReplayIcon fontSize="small" />}
                 onClick={onRetryPayment}
                 {...(onRetryPayment
@@ -282,11 +287,11 @@ const OrderTimeline = ({ order, onRetryPayment, onRestoreCart }) => {
               </Button>
             )}
             {onRestoreCart && (
-              <Button size="small" variant="outlined" onClick={onRestoreCart}>
+              <Button variant="outlined" onClick={onRestoreCart}>
                 Restore my cart
               </Button>
             )}
-            <SupportLink variant="button" size="small" orderNumber={order.order_number} topic="payment" />
+            <SupportLink variant="button" orderNumber={order.order_number} topic="payment" />
           </Stack>
         </Box>
       )}

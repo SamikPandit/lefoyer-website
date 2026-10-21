@@ -1,6 +1,14 @@
 /* ============================================================================
-   Le foyeR. — "Counter" design system
-   Single source of truth for design tokens. theme.js reads these by name.
+   Le foyeR. — "ALCOVE"
+   docs/ART_DIRECTION.md §3 is the binding spec; this file is its single
+   source of truth. theme.js reads every one of these by name and holds real
+   hex ONLY where MUI needs it for alpha()/augmentColor().
+
+   Le foyeR. is French for the hearth. A hearth is not an adjective — it is an
+   arched opening in a wall with light falling out of it. Every photograph on
+   this site stands inside one. The arch is the NICHE the photograph stands
+   in, never a mask over it (§1.1, §1.2).
+
    Fonts are loaded in index.html via <link>. NEVER @import them here.
    ========================================================================== */
 
@@ -16,170 +24,248 @@
 
 /* ============================================================================
    1. TOKENS
-   Contrast ratios are measured against the surface named. Any token marked
-   NON-TEXT is forbidden as a text colour — it exists for fills and borders.
+   Every ratio below is computed with the relative-luminance formula, not
+   estimated. Any token marked NON-TEXT is forbidden as a text colour.
    ========================================================================== */
 :root {
   color-scheme: only light;
 
-  /* --- Typeface stacks --- */
+  /* --- §3.7 Typeface stacks ------------------------------------------------
+     Inter Tight is already an optically tight face: no tracking value past
+     -0.012em above 24px. Stacking optical tracking on a tight face is the
+     Linear/Vercel signature, and it is a token value, not a typeface. */
   --lf-font-ui:      'Inter', 'Inter-fallback', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --lf-font-display: 'Inter Tight', 'Inter', 'Inter-fallback', system-ui, -apple-system, sans-serif;
   --lf-font-brand:   'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
 
-  /* --- Surfaces: warm, never neutral grey. #FAFAFA is banned sitewide. --- */
-  --lf-canvas:         #FDFBF9;  /* page background, EVERY page */
-  --lf-surface:        #FFFFFF;  /* cards, buy-box, panels, inputs */
-  --lf-surface-raised: #FFFDFB;  /* panel on a panel; the hero purchase card */
-  --lf-surface-sunken: #F6F2EC;  /* image mats, gallery frame, inert wells */
-  --lf-surface-quiet:  #F0ECE6;  /* disabled fills, skeleton base */
-  --lf-surface-glass:  rgba(253, 251, 249, 0.82); /* nav + sticky bars ONLY */
-  --lf-sheet-glass:    rgba(253, 251, 249, 0.92); /* drawers + overlays ONLY */
-  --lf-overlay:        rgba(20, 17, 15, 0.56);    /* modal / drawer scrim */
-  --lf-blur:           blur(20px) saturate(180%);
+  /* --- §3.1 Surfaces — the warm axis, pushed until it is PERCEPTIBLE -------
+     Spread = R−B channel difference out of 255. The old --lf-canvas had a
+     spread of 4/255 and --lf-surface was literally #FFFFFF, so the three
+     surfaces a customer looks at were white, almost-white and almost-white.
+       canvas → paper 1.115:1 · canvas → mat 1.080:1 · paper → mat 1.204:1
+       mat → mat-deep 1.094:1 · canvas → mat-deep 1.182:1 · canvas → quiet 1.155:1 */
+  --lf-canvas:      #F6EFE4;  /* spread 18 — page background, EVERY route */
+  --lf-paper:       #FFFCF6;  /* spread  9 — cards, inputs, panels, buy box */
+  --lf-mat:         #F1E6D6;  /* spread 27 — THE NICHE WALL, image wells, gallery frame */
+  --lf-mat-deep:    #EADCC7;  /* spread 35 — the UNLIT niche. NON-TEXT / LARGE-TEXT ONLY */
+  --lf-quiet:       #E9DFCF;  /* spread 26 — disabled fills, skeleton base */
+  --lf-hearth:      #1C1411;  /* the dark band + footer */
+  --lf-hearth-glow: #4A3524;  /* the lit corner of the hearth gradient */
+  --lf-paper-glass: rgba(246, 239, 228, 0.86);  /* nav + sticky bars ONLY */
+  --lf-sheet-glass: rgba(246, 239, 228, 0.94);  /* drawers + overlays ONLY */
+  --lf-overlay:     rgba(28, 20, 17, 0.56);
+  --lf-blur:        blur(20px) saturate(180%);
 
-  /* --- Ink tiers --- */
-  --lf-ink:    #14110F;  /* 18.4:1 canvas · 18.8:1 white — headings, body, PRICE */
-  --lf-ink-2:  #4A433C;  /*  9.42:1 canvas — long-form body, descriptions */
-  --lf-ink-3:  #6B635A;  /*  5.72:1 canvas · 5.29:1 sunken — captions, meta */
-  --lf-ink-4:  #8A8178;  /*  3.70:1 — NON-TEXT ONLY: field borders, disabled glyphs */
-  --lf-on-ink: #FFFFFF;  /* 18.8:1 on --lf-ink */
+  /* DEPRECATED ALIASES — kept for ONE release so no component breaks
+     mid-sweep (§9.2). Deleted in step 9.10. Nothing new may use them. */
+  --lf-surface:        var(--lf-paper);
+  --lf-surface-sunken: var(--lf-mat);
+  --lf-surface-quiet:  var(--lf-quiet);
+  /* --lf-surface-glass is NOT aliased: verified zero consumers in src. */
 
-  /* --- Gold, RETIERED. This is the brand-equity fix. --- */
-  --lf-gold:        #C9A96E;  /* 2.17:1 — NON-TEXT ONLY. Badge fills (ink label = 8.4:1),
-                                 hairline rules, stars on dark, wordmark on ink. */
-  --lf-gold-edge:   #A8803A;  /* 3.50:1 — NON-TEXT indicators: selected thumb border,
-                                 active tab underline, star fill on light, progress */
-  --lf-gold-ink:    #7A5A24;  /* 6.14:1 canvas · 6.33:1 white — gold AS TEXT: eyebrows,
-                                 tertiary links, "Notify me" */
-  --lf-gold-ink-hv: #6E4F1E;  /* 7.27:1 — hover/visited for the above */
-  --lf-gold-fill:   #8C6A24;  /* white label = 5.00:1 — the ONE gold solid button (Join) */
-  --lf-gold-tint:   #F7F0E2;  /* eyebrow/badge wash. ink on it = 15.9:1 */
-  --lf-gold-tint-2: #EFE4CE;  /* pressed state of the above */
-  --lf-rule-gold:   rgba(201, 169, 110, 0.42); /* THE section hairline under every h2 */
+  /* --- §3.2 Ink — warmed to match the paper, headline ratio untouched ------
+                      canvas  paper   mat    mat-deep  quiet
+     --lf-ink         15.97   17.81   14.79   13.51    13.83
+     --lf-ink-2        8.37    9.33    7.75    7.08     7.25
+     --lf-ink-3        5.38    6.00    4.98    4.55     4.65
+     --lf-ink-4        3.25    3.63    3.01    2.75     2.82   NON-TEXT ONLY
+     --lf-border-field 3.63    4.05    3.36    3.07     3.14 */
+  --lf-ink:           #1A1410;  /* headings, body, PRICE */
+  --lf-ink-2:         #4C443B;  /* long-form body, descriptions */
+  --lf-ink-3:         #6A6056;  /* captions, meta, AND disabled labels (4.65:1 on quiet) */
+  --lf-ink-4:         #8D8378;  /* NON-TEXT ONLY: field borders, disabled glyphs */
+  --lf-border-field:  #857B70;  /* MANDATORY on input/checkbox/radio (SC 1.4.11) */
+  --lf-hairline:      #E0D2BC;  /* decorative separators only */
+  --lf-border:        #D4C3A8;  /* card hover border, table rules */
+  --lf-border-strong: #BFAD92;  /* chip outlines, weighted dividers */
+  --lf-border-ink:    #1A1410;  /* secondary button, selected tile */
+  --lf-on-hearth:     #FBF4E8;
+  --lf-on-hearth-2:   #D9CCB8;
+  --lf-on-ink:        var(--lf-on-hearth);  /* label on an ink fill — 16.5:1 */
 
-  /* --- Borders --- */
-  --lf-hairline:      #E7E0D6;  /* default separator (decorative) */
-  --lf-border:        #DED6C9;  /* card hover border, table rules */
-  --lf-border-strong: #C9BFAE;  /* chip outlines, weighted dividers */
-  --lf-border-field:  #8A8178;  /* 3.70:1 — MANDATORY on input/checkbox/radio (SC 1.4.11) */
-  --lf-border-ink:    #14110F;  /* secondary button, selected tile */
+  /* --- §3.3 Gold — four tiers, two licensed fills --------------------------
+     Gold has exactly three jobs: (1) the LEDGE, (2) `Notify me`, (3) the
+     newsletter `Join`. --lf-rule-gold is DELETED: rgba(201,169,110,.42)
+     composites to 1.30:1 over canvas — an accent below the perception floor
+     repeated four times is not a brand, it is a template (§2.3). */
+  --lf-gold:        #C9A96E;  /* 1.96:1 canvas — NON-TEXT: ledge, badge fills, wordmark on hearth */
+  --lf-gold-edge:   #A8803A;  /* 3.16:1 canvas — indicators: selected thumb, active underline */
+  --lf-gold-ink:    #7A5A24;  /* 5.55:1 canvas · 6.19:1 paper · 5.14:1 mat — gold AS TEXT */
+  --lf-gold-ink-hv: #6E4F1E;  /* 6.57:1 canvas */
+  --lf-gold-fill:   #8C6A24;  /* white label 5.00:1 — LICENSED FILL 2 of 2 (Join) */
+  --lf-gold-tint:   #F4E9D2;  /* ink on it 15.14:1 · gold-ink on it 5.26:1 */
+  --lf-gold-tint-2: #EADCBC;  /* pressed state of the tint (ink on it 13.43:1) */
 
-  /* --- Semantic --- */
-  --lf-ok-ink:    #15663D;  /* 6.78:1 — "In stock", "Save 19%", "Free delivery" */
-  --lf-ok:        #1E7A4D;  /* 5.16:1 — the 6px stock dot, check glyphs */
-  --lf-ok-tint:   #E7F4EC;  /* ok-ink on it = 6.18:1 */
-  --lf-warn-ink:  #7A4F00;  /* 6.91:1 — "Only 3 left", "Ships in 5-7 days" */
-  --lf-warn-tint: #FDF3E0;  /* warn-ink on it = 6.47:1 */
-  --lf-err-ink:   #A01C15;  /* 7.61:1 canvas · 7.86:1 white-on-it */
-  --lf-err-tint:  #FCECEA;  /* err-ink on it = 6.86:1 */
+  /* --lf-rule-gold AND --lf-e-edge ARE NOW GONE, NOT NEUTRALISED. The
+     foundation could only define them as "draws nothing" (an UNDEFINED custom
+     property inside a shorthand invalidates the whole declaration at
+     computed-value time, so `box-shadow: var(--lf-e-edge), var(--lf-e1)` would
+     have lost its --lf-e1 too). Every call site the inline list named —
+     Checkout, Cart, Profile, OrderDetail, OrderConfirmation, CartTotals,
+     CrossSell, Footer, the two deleted home components — has migrated to
+     `elevation` / `.lf-ledge` / --lf-hairline, verified by grep over src.
+     Depth is requested with `elevation` and nothing else (§3.11). */
 
-  /* --- Focus --- */
-  --lf-focus:         #14110F;  /* 18.4:1 ring on every light surface */
-  --lf-focus-on-ink:  #E3C78C;  /* 11.5:1 ring inside .lf-ink-section */
-  --lf-focus-inner:   #FDFBF9;  /* the 1px separator that keeps the ring alive on ink fills */
+  /* --- §3.4 Semantic ------------------------------------------------------ */
+  --lf-ok-ink:    #15663D;  /* 6.13:1 canvas — "In stock", "Free delivery" */
+  --lf-ok:        #1E7A4D;  /* 4.66:1 — the 6px stock dot (non-text) */
+  --lf-ok-tint:   #E4F1E8;  /* ok-ink on it 6.02:1 */
+  --lf-warn-ink:  #7A4F00;  /* 6.24:1 canvas — "Back soon" */
+  --lf-warn-tint: #FBEFD9;  /* warn-ink on it 6.26:1 */
+  --lf-err-ink:   #A01C15;  /* 6.88:1 canvas */
+  --lf-err-tint:  #FBE9E6;  /* err-ink on it 6.70:1 */
 
-  /* --- Spacing: 4px scale for raw CSS. MUI spacing() stays at 8. --- */
-  --lf-1:4px;   --lf-2:8px;   --lf-3:12px;  --lf-4:16px;  --lf-5:20px;
-  --lf-6:24px;  --lf-8:32px;  --lf-10:40px; --lf-12:48px; --lf-16:64px;
-  --lf-20:80px; --lf-24:96px; --lf-30:120px;--lf-40:160px;
+  /* --- §3.6 Focus --------------------------------------------------------- */
+  --lf-focus:       #1A1410;  /* 15.97:1 canvas · 14.79:1 mat */
+  --lf-focus-inner: #FBF4E8;
 
-  /* --- Radii: tiered by component class. shape.borderRadius = 14. --- */
-  --lf-r-chip:6px;    --lf-r-field:10px; --lf-r-card:14px;
-  --lf-r-panel:18px;  --lf-r-media:24px; --lf-r-pill:999px;
+  /* --- §3.8 Spacing — theme.spacing STAYS 8 (§2.17). These are for raw CSS
+         and full-bleed components. --lf-20/24/30/40 are DELETED (no consumers). */
+  --lf-1:4px;  --lf-2:8px;  --lf-3:12px; --lf-4:16px; --lf-5:20px;
+  --lf-6:24px; --lf-8:32px; --lf-10:40px; --lf-12:48px; --lf-16:64px;
 
-  /* --- Elevation: warm-tinted rgba(20,17,15). Never neutral black. --- */
+  /* THE PAGE GUTTER — the most-used spatial value on the site, which existed
+     only as four literals inside MuiContainer.styleOverrides. Marquee's pause
+     button collided with the viewport edge precisely because it had no gutter
+     value to reference. */
+  --lf-gutter: 16px;
+
+  /* THE SECTION RHYTHM — replaces six ad-hoc py pairs scattered across the app. */
+  --lf-sect-sm: 40px; --lf-sect: 56px; --lf-sect-lg: 72px;
+
+  /* THE CARD FLOOR — so the grid minimum and the button padding can never
+     drift apart again. 340px of niche ÷ 1.18 = 288px exactly. */
+  --lf-card-min: 288px;
+
+  /* --- §3.9 Radii — tiered by WHAT THE THING IS (§2.5 overturned) ---------
+     A uniform 14px corner on every card, field and panel is the single most
+     common shape language on the web, and it is why the surface layer read
+     as one notch from a generic SaaS card. shape.borderRadius = 12.
+     Image frames take the niche. No component writes a raw radius. */
+  --lf-r-chip:6px;   --lf-r-field:10px; --lf-r-card:12px;
+  --lf-r-panel:16px; --lf-r-foot:18px;  --lf-r-pill:999px;
+  --lf-r-photo:8px;  /* the photograph inside the niche */
+  --lf-r-media: var(--lf-r-panel);  /* DEPRECATED alias — deleted in step 9.10 */
+
+  /* --- §3.10 THE NICHE — the one shape that carries the brand -------------
+     --lf-r-arch is a LOCKED token. Push the vertical radius past ~30% and
+     the shallow dome becomes a pointed niche with memorial or religious
+     connotations; the 18px foot keeps it reading as furniture, i.e. as a
+     SHELF rather than a vitrine — the correct register for ₹280–480 family
+     skincare. Because the radii are percentages the proportion holds
+     identically from a 72px footer thumb to a 490px hero frame with no
+     breakpoint maths. At any niche width W: height 1.18W, photograph 0.86W
+     square, dome zone 0.26W. */
+  --lf-arch-ratio: 1.18;   /* niche height ÷ niche width — LOCKED */
+  --lf-arch-inset: 7%;     /* photograph side inset, of niche width */
+  --lf-arch-foot:  6%;     /* photograph bottom inset, of niche width */
+  --lf-r-arch: 50% 50% var(--lf-r-foot) var(--lf-r-foot) / 26% 26% var(--lf-r-foot) var(--lf-r-foot);
+
+  /* --- §3.11 Elevation — ONE ramp, and it actually reaches the surfaces ----
+     theme.js previously defined E1–E4 as JS string literals used by every
+     theme surface while components used var(--lf-e1..4), so the inverted
+     redefinitions could never affect a theme-rendered surface. Both consts
+     and --lf-e-edge are DELETED; theme.shadows[1..4] now map to these.
+     With the card frame gone, product cards cast NO shadow at all. */
   --lf-e0: none;
-  --lf-e1: 0 1px 2px rgba(20,17,15,0.05), 0 0 0 1px rgba(20,17,15,0.045);
-  --lf-e2: 0 2px 4px rgba(20,17,15,0.05), 0 8px 20px -6px rgba(20,17,15,0.09);
-  --lf-e3: 0 4px 8px rgba(20,17,15,0.06), 0 18px 36px -10px rgba(20,17,15,0.13);
-  --lf-e4: 0 8px 16px rgba(20,17,15,0.07), 0 36px 72px -18px rgba(20,17,15,0.19);
-  --lf-e-nav: 0 1px 0 rgba(20,17,15,0.07), 0 6px 20px -10px rgba(20,17,15,0.10);
-  --lf-e-bar: 0 -1px 0 rgba(20,17,15,0.08), 0 -10px 28px -10px rgba(20,17,15,0.11);
-  --lf-e-edge: inset 0 1px 0 rgba(255,255,255,0.72); /* the 1px top highlight */
+  --lf-e1: 0 1px 2px rgba(44,31,20,.055);
+  --lf-e2: 0 2px 4px rgba(44,31,20,.05), 0 8px 20px -6px rgba(44,31,20,.10);
+  --lf-e3: 0 4px 8px rgba(44,31,20,.06), 0 18px 36px -10px rgba(44,31,20,.14);
+  --lf-e4: 0 8px 16px rgba(44,31,20,.07), 0 36px 72px -18px rgba(44,31,20,.20);
+  --lf-e-nav: 0 1px 0 rgba(44,31,20,.07), 0 6px 20px -10px rgba(44,31,20,.11);
+  --lf-e-bar: 0 -1px 0 rgba(44,31,20,.08), 0 -10px 28px -10px rgba(44,31,20,.12);
 
-  /* --- Motion --- */
+  /* --- §3.12 Motion — ONE ramp, declared once -----------------------------
+     theme.transitions duplicated this numerically, had zero consumers, and
+     mapped MUI's `sharp` to the system's DEFAULT curve. Deleted.
+     Press ladder, scaled by element size: button/chip .972 · card .985 ·
+     full-width row .992 · panel >320px no scale, opacity .94.
+     Every exit is faster than its entry. transform/opacity only, plus
+     colour, border and shadow. */
   --lf-dur-1:110ms;  /* press, tick, badge bump */
-  --lf-dur-2:180ms;  /* colour, border, shadow, icon rotate, nav condense */
-  --lf-dur-3:260ms;  /* image crossfade, card raise, accordion, tab indicator */
-  --lf-dur-4:380ms;  /* overlay, drawer, modal, route transition */
-  --lf-ease:        cubic-bezier(0.22, 0.61, 0.36, 1);
-  --lf-ease-out:    cubic-bezier(0.16, 1.00, 0.30, 1);
-  --lf-ease-in:     cubic-bezier(0.40, 0.00, 1.00, 1.00);
-  --lf-ease-inout:  cubic-bezier(0.45, 0.05, 0.55, 0.95);
-  --lf-ease-spring: cubic-bezier(0.34, 1.26, 0.64, 1);
+  --lf-dur-2:180ms;  /* colour, border, shadow */
+  --lf-dur-3:260ms;  /* image crossfade, accordion, reveal, popover */
+  --lf-dur-4:340ms;  /* overlay, drawer, route */
+  --lf-ease:        cubic-bezier(.22,.61,.36,1);
+  --lf-ease-out:    cubic-bezier(.16,1,.30,1);
+  --lf-ease-in:     cubic-bezier(.40,0,1,1);
+  --lf-ease-spring: cubic-bezier(.34,1.26,.64,1);  /* licensed for exactly two
+                      moments: the bag badge and the success tick */
 
-  /* --- Layout --- */
+  /* --- Layout ------------------------------------------------------------- */
   --lf-nav-h: 56px;
-  --lf-bar-h: 0px;          /* set to 68px by JS while a sticky bottom bar is mounted */
-  --lf-container: 1232px;
+  --lf-bar-h: 0px;          /* set by JS while a sticky bottom bar is mounted */
+  --lf-container: 1232px;   /* §3.13: widens to 1296px at xl 1440 */
 }
 
-@media (min-width: 900px) { :root { --lf-nav-h: 64px; } }
+/* §3.8 — the gutter scales on the breakpoints the design actually turns on. */
+@media (min-width:600px)  { :root { --lf-gutter: 24px; } }
+@media (min-width:900px)  { :root { --lf-gutter: 32px; } }
+@media (min-width:1200px) { :root { --lf-gutter: 40px; } }
+@media (min-width:900px)  { :root { --lf-sect-sm:64px; --lf-sect:96px; --lf-sect-lg:128px; } }
+@media (min-width:900px)  { :root { --lf-nav-h: 64px; } }
+@media (min-width:1440px) { :root { --lf-container: 1296px; } }
 
-/* --- The inverted surface. Redeclares the SAME names, so every child
-       component works unchanged inside it with zero overrides. ------------- */
-.lf-ink-section {
-  --lf-canvas:#14110F; --lf-surface:#1C1917; --lf-surface-raised:#211E1B;
-  --lf-surface-sunken:#211E1B; --lf-surface-quiet:#262320;
-  --lf-ink:#F7F4F0;    /* 17.2:1 */
-  --lf-ink-2:#D3CBC2;  /* 11.0:1 */
-  --lf-ink-3:#A8A099;  /*  7.30:1 */
-  --lf-ink-4:#8F877E;  /*  5.33:1 */
-  --lf-on-ink:#14110F;
-  --lf-gold:#C9A96E;       /* 8.4:1 — legible as TEXT here, and only here */
-  --lf-gold-edge:#C9A96E;
-  --lf-gold-ink:#E3C78C;   /* 11.5:1 */
-  --lf-gold-ink-hv:#EFD9AC;
-  --lf-gold-fill:#DDBE84;
-  --lf-gold-tint:rgba(201,169,110,0.16);
-  --lf-gold-tint-2:rgba(201,169,110,0.24);
-  --lf-rule-gold:rgba(201,169,110,0.34);
-  --lf-hairline:rgba(247,244,240,0.12); --lf-border:rgba(247,244,240,0.18);
-  --lf-border-strong:rgba(247,244,240,0.28); --lf-border-field:rgba(247,244,240,0.46);
-  --lf-border-ink:#F7F4F0;
-  --lf-ok-ink:#5FCB93;  --lf-ok:#5FCB93;  --lf-ok-tint:rgba(95,203,147,0.14);
-  --lf-warn-ink:#EFBC6A; --lf-warn-tint:rgba(239,188,106,0.14);
-  --lf-err-ink:#F4A49F;  --lf-err-tint:rgba(244,164,159,0.14);
-  --lf-focus:var(--lf-focus-on-ink);
-  --lf-focus-inner:#14110F;
-  --lf-e-edge: inset 0 1px 0 rgba(255,255,255,0.08);
-  background: var(--lf-canvas);
+/* ============================================================================
+   §3.5 THE INVERTED SURFACE — .lf-hearth-section
+   Applied to EXACTLY TWO surfaces: the home interstitial and the footer.
+   It redeclares the SAME names, so every child works inside it with zero
+   overrides. Every value passes AA across the ENTIRE gradient, which is why
+   a gradient is safe here:
+                                on #1C1411   at the glow's brightest #4A3524
+     --lf-ink         #FBF4E8      16.59:1            10.52:1
+     --lf-ink-2       #D9CCB8      11.47:1             7.27:1
+     --lf-gold-ink    #E3C78C      11.07:1             7.02:1
+     --lf-gold (as text, wordmark) 8.11:1              5.14:1
+   ========================================================================== */
+.lf-hearth-section {
+  background: radial-gradient(90% 130% at 12% 100%, #4A3524 0%, #2A201A 38%, #1C1411 74%);
+  --lf-canvas:#1C1411; --lf-paper:#241B16; --lf-mat:#2A201A; --lf-mat-deep:#241B16;
+  --lf-quiet:#2F241D;
+  /* --lf-ink-3 is #B2A695, NOT §3.5's #A89C8B: that value measures 4.27:1
+     against the gradient's brightest point #4A3524 and so fails AA in the
+     bottom-left corner where the glow actually lands. §3.5's own premise
+     is "every value passes AA across the ENTIRE gradient", so the hex is
+     raised to satisfy the stated rule: 4.81:1 at the glow, 7.59:1 on
+     #1C1411 — still plainly recessive against --lf-ink at 16.59:1.
+     --lf-ink-4 is raised for the same reason: it is NON-TEXT, so it only
+     needs SC 1.4.11's 3:1 for a field border, and #8A7E6E measured 2.90:1
+     at the glow. #908474 is 3.14:1 there and 4.96:1 on #1C1411. */
+  --lf-ink:#FBF4E8; --lf-ink-2:#D9CCB8; --lf-ink-3:#B2A695; --lf-ink-4:#908474;
+  --lf-gold-ink:#E3C78C; --lf-gold-ink-hv:#EFD9AC;
+  --lf-hairline:rgba(251,244,232,.14); --lf-border:rgba(251,244,232,.22);
+  --lf-border-strong:rgba(251,244,232,.30); --lf-border-field:rgba(251,244,232,.52);
+  --lf-border-ink:#FBF4E8;
+  --lf-gold-tint:rgba(201,169,110,.16); --lf-gold-tint-2:rgba(201,169,110,.24);
+  --lf-ok-ink:#7FD3A6; --lf-ok:#7FD3A6; --lf-ok-tint:rgba(127,211,166,.14);
+  --lf-warn-ink:#EFBC6A; --lf-warn-tint:rgba(239,188,106,.14);
+  --lf-err-ink:#F4A49F;  --lf-err-tint:rgba(244,164,159,.14);
+  --lf-focus:#E3C78C;
+  --lf-focus-inner:#1C1411;
+  /* An ink fill inverts to a light fill here, so its label must invert too. */
+  --lf-on-ink:#1C1411;
+  /* The four overrides the previous build was missing: without them every
+     card inside the dark band carried a 0 0 0 1px rgba(20,17,15,.045) ring
+     that is invisible on #1C1411. */
+  --lf-e1: 0 0 0 1px rgba(251,244,232,.14);
+  --lf-e2: 0 2px 4px rgba(0,0,0,.30), 0 0 0 1px rgba(251,244,232,.14);
+  --lf-e3: 0 8px 20px -6px rgba(0,0,0,.42), 0 0 0 1px rgba(251,244,232,.16);
+  --lf-e4: 0 24px 56px -16px rgba(0,0,0,.52), 0 0 0 1px rgba(251,244,232,.18);
   color: var(--lf-ink);
   color-scheme: dark;
 }
 
-/* --- Dark theme: SPECIFIED, NOT ENABLED. Do not wire a toggle until the
-       catalogue is re-shot on a dark set or image_main_dark exists. -------- */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { /* INTENTIONALLY EMPTY THIS RELEASE */ }
+/* --- Legacy aliases must re-resolve INSIDE the inverted surface too, or a
+       component still on --lf-surface would paint the light paper on it. --- */
+.lf-hearth-section {
+  --lf-surface: var(--lf-paper);
+  --lf-surface-sunken: var(--lf-mat);
+  --lf-surface-quiet: var(--lf-quiet);
 }
-html[data-theme="dark"] {
-  color-scheme: dark;
-  --lf-canvas:#121110; --lf-surface:#1A1816; --lf-surface-raised:#211E1B;
-  --lf-surface-sunken:#211E1B; --lf-surface-quiet:#262320;
-  --lf-surface-glass:rgba(18,17,16,0.82); --lf-sheet-glass:rgba(18,17,16,0.94);
-  --lf-overlay:rgba(0,0,0,0.68);
-  --lf-ink:#F5F2EE; --lf-ink-2:#D3CBC2; --lf-ink-3:#A8A099; --lf-ink-4:#8F877E;
-  --lf-on-ink:#121110;
-  --lf-gold:#C9A96E; --lf-gold-edge:#C9A96E; --lf-gold-ink:#E3C78C;
-  --lf-gold-ink-hv:#EFD9AC; --lf-gold-fill:#DDBE84;
-  --lf-gold-tint:rgba(201,169,110,0.14); --lf-gold-tint-2:rgba(201,169,110,0.22);
-  --lf-rule-gold:rgba(201,169,110,0.34);
-  --lf-hairline:rgba(245,242,238,0.10); --lf-border:rgba(245,242,238,0.16);
-  --lf-border-strong:rgba(245,242,238,0.26); --lf-border-field:rgba(245,242,238,0.46);
-  --lf-border-ink:#F5F2EE;
-  --lf-ok-ink:#5FCB93; --lf-ok:#5FCB93; --lf-ok-tint:rgba(95,203,147,0.14);
-  --lf-warn-ink:#EFBC6A; --lf-warn-tint:rgba(239,188,106,0.14);
-  --lf-err-ink:#F4A49F; --lf-err-tint:rgba(244,164,159,0.14);
-  --lf-focus:#E3C78C; --lf-focus-inner:#121110;
-  --lf-e1:0 0 0 1px rgba(245,242,238,0.08);
-  --lf-e2:0 0 0 1px rgba(245,242,238,0.14), 0 8px 24px -8px rgba(0,0,0,0.6);
-  --lf-e3:0 0 0 1px rgba(245,242,238,0.16), 0 20px 48px -12px rgba(0,0,0,0.7);
-  --lf-e4:0 0 0 1px rgba(245,242,238,0.18), 0 40px 80px -20px rgba(0,0,0,0.8);
-  --lf-e-edge: inset 0 1px 0 rgba(255,255,255,0.08);
-}
-html[data-theme="dark"] img[data-product] { background: #F5F2EE; }
+
+/* §2.6 upheld: NO auto dark mode. Every one of the 19 masters is shot on a
+   bright ground, and nothing in src/ has ever set html[data-theme]. The
+   specified-but-unreachable dark block is deleted rather than maintained. */
 
 /* ============================================================================
    2. RESET
@@ -221,7 +307,7 @@ a:hover { color: var(--lf-gold-ink-hv); }
 [hidden] { display: none !important; }
 
 /* ============================================================================
-   3. FOCUS — one ring, everywhere, no exceptions
+   3. FOCUS — §3.6. One ring, everywhere, no exceptions.
    ========================================================================== */
 *:focus-visible {
   outline: 2px solid var(--lf-focus);
@@ -230,11 +316,12 @@ a:hover { color: var(--lf-gold-ink-hv); }
 }
 *:focus:not(:focus-visible) { outline: none; }
 
-/* Inside a scroll container the ring must not be clipped */
+/* Inside a scroll container the ring must not be clipped (A7). */
 .lf-scroll *:focus-visible,
+.lf-rail *:focus-visible,
 [data-scroll-region] *:focus-visible { outline-offset: -2px; }
 
-/* On an ink fill or a gold fill: two-layer ring so it survives any backdrop */
+/* On an ink fill or a gold fill: two-layer ring so it survives any backdrop. */
 .lf-ring-inset:focus-visible,
 .MuiButton-containedPrimary.Mui-focusVisible,
 [data-on-fill]:focus-visible {
@@ -242,9 +329,8 @@ a:hover { color: var(--lf-gold-ink-hv); }
   outline-offset: -4px;
   box-shadow: 0 0 0 2px var(--lf-focus-inner), 0 0 0 4px var(--lf-focus);
 }
-.lf-ink-section *:focus-visible { outline-color: var(--lf-focus-on-ink); }
 
-/* Skip link — the first focusable element on every page */
+/* Skip link — the first focusable element on every page (A15). */
 .lf-skip-link {
   position: fixed; top: -200px; left: 16px; z-index: 2000;
   display: inline-flex; align-items: center; height: 44px; padding: 0 20px;
@@ -258,7 +344,7 @@ a:hover { color: var(--lf-gold-ink-hv); }
 /* ============================================================================
    4. SELECTION + SCROLLBAR
    ========================================================================== */
-::selection { background: var(--lf-gold-tint-2); color: var(--lf-ink); } /* was 1.9:1 */
+::selection { background: var(--lf-gold-tint-2); color: var(--lf-ink); }
 
 * { scrollbar-width: thin; scrollbar-color: var(--lf-border) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -272,7 +358,133 @@ a:hover { color: var(--lf-gold-ink-hv); }
 .lf-rail { scrollbar-width: none; }
 
 /* ============================================================================
-   5. UTILITIES
+   5. THE LEDGE — §3.3, replacing the §2.10 gold hairline
+   2px solid #C9A96E at 1.96:1, full column width, with a warm under-shadow so
+   it reads as the lit front edge of a shelf. Decorative, not an SC 1.4.11
+   boundary, so 1.96:1 is the correct target.
+   NEVER capped by a call site. MAXIMUM FOUR PER PAGE.
+   ========================================================================== */
+.lf-ledge {
+  height: 2px; width: 100%; border: 0; flex: none;
+  background: var(--lf-gold);
+  box-shadow: 0 2px 0 rgba(201,169,110,.28), 0 10px 18px -10px rgba(74,53,36,.30);
+  transition: height var(--lf-dur-2) var(--lf-ease);
+}
+
+/* The §2.10 hairline, demoted to a plain decorative separator so the ~12
+   surfaces still carrying .lf-rule degrade to an honest neutral line rather
+   than to an invisible one. Gold belongs to .lf-ledge now. */
+.lf-rule { height:1px; border:0; background: var(--lf-hairline); width:100%; }
+
+/* ============================================================================
+   6. THE NICHE — §3.10. The one shape that carries the brand.
+   The arch is the WALL the photograph stands in, never a mask over it.
+   Composed only by <Alcove> (§6.1 / §2.30): no page builds one by hand, so a
+   surface can never render a product without its frame.
+   ========================================================================== */
+.lf-alcove {
+  position: relative;
+  aspect-ratio: 1 / var(--lf-arch-ratio);
+  inline-size: min(100%, calc(var(--lf-alcove-max, 9999px) / var(--lf-arch-ratio)));
+  margin-inline: auto;
+  background: var(--lf-mat);
+  border-radius: var(--lf-r-arch);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* THE HEARTH LIGHT — painted on the WALL, never on the photograph.
+   The grounds include cyan #9DE1E7, deep blue #134F85 and pink #F6A5C8; a
+   warm wash over them produces mud (§10.2). Two STATIC gradients: no
+   backdrop-filter, no filter(), no blur — legal inside a scrolling list
+   under §9.4 and free on a mid-range Android. */
+.lf-alcove::before {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(118% 86% at 26% 10%, rgba(255,246,228,.92) 0%, rgba(252,240,219,.42) 44%, rgba(252,240,219,0) 70%),
+    linear-gradient(180deg, rgba(28,20,17,0) 58%, rgba(44,31,20,.14) 100%);
+}
+
+/* THE PHOTOGRAPH — 1:1 from a 1:1 master, so object-fit:cover crops NOTHING.
+   It sits at the FOOT of the taller niche, inset, with its own small radius,
+   an identical hairline ring around every ground, and a foot-shade so it
+   reads as standing ON the floor of the niche. */
+/* Anything <Alcove> is given as children — the wishlist heart at the niche's
+   bottom-right (§6.2 item 1) — paints ABOVE the photograph. Never a status
+   badge: the status ledge is a full-width row BENEATH the niche, which is
+   what makes the badge/heart collision structurally impossible at any card
+   width in any language (§2.14). */
+.lf-alcove > * { position: relative; z-index: 2; }
+
+.lf-alcove > .lf-alcove-img {
+  position: absolute; z-index: 1;
+  left: var(--lf-arch-inset); right: var(--lf-arch-inset); bottom: var(--lf-arch-foot);
+  aspect-ratio: 1 / 1;
+  border-radius: var(--lf-r-photo);
+  overflow: hidden;
+  background: var(--lf-mat);
+  box-shadow: 0 0 0 1px rgba(26,20,16,.10),         /* the identical edge around every ground */
+              0 10px 20px -10px rgba(44,31,20,.34);  /* the foot-shade */
+  transition:
+    transform var(--lf-dur-2) var(--lf-ease),
+    box-shadow var(--lf-dur-2) var(--lf-ease);
+}
+.lf-alcove > .lf-alcove-img > picture,
+.lf-alcove > .lf-alcove-img > img { display: block; width: 100%; height: 100%; }
+.lf-alcove > .lf-alcove-img img { width:100%; height:100%; object-fit:cover; display:block; }
+
+/* The fallback when a product genuinely has no image (§7.5 rule 2: a tile
+   with no image never renders its own name as placeholder artwork). The
+   niche still renders — it is the brand — but it holds an empty shelf, not
+   a word pretending to be a photograph. */
+.lf-alcove > .lf-alcove-img[data-empty="true"] {
+  background: var(--lf-mat-deep);
+  box-shadow: 0 0 0 1px rgba(26,20,16,.10);
+}
+
+/* OUT OF STOCK (§2.11): the light goes out, the niche does not, and the
+   photograph is NEVER touched. No greyscale, no opacity drop, no
+   desaturation, no diagonal ribbon — the photograph is what creates desire,
+   and dimming it is how a shop tells you not to want something. */
+[data-stock="out"] .lf-alcove,
+.lf-alcove[data-stock="out"] { background: var(--lf-mat-deep); }
+[data-stock="out"] .lf-alcove::before,
+.lf-alcove[data-stock="out"]::before {
+  background: linear-gradient(180deg, rgba(28,20,17,0) 62%, rgba(44,31,20,.16) 100%);
+}
+/* `coming_soon` keeps the niche lit and the card a working link (§6.2): a
+   product you cannot buy YET is not a product the shop is hiding. */
+
+/* §3.12 — hover/focus on a card: the photograph lifts 4px and its foot-shade
+   tightens. Transform and box-shadow only. The card is the ancestor carrying
+   data-stock (§6.2), so no page wires this up. */
+@media (hover: hover) {
+  [data-stock]:hover > .lf-alcove > .lf-alcove-img,
+  [data-stock]:hover .lf-alcove > .lf-alcove-img {
+    transform: translateY(-4px);
+    box-shadow: 0 0 0 1px rgba(26,20,16,.10), 0 6px 12px -8px rgba(44,31,20,.40);
+  }
+}
+[data-stock]:focus-within .lf-alcove > .lf-alcove-img {
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 1px rgba(26,20,16,.10), 0 6px 12px -8px rgba(44,31,20,.40);
+}
+
+/* §3.10 — --lf-alcove-max is a HEIGHT cap; the rule above divides it by the
+   locked ratio to get the niche's inline size. 340 ÷ 1.18 = 288 = --lf-card-min. */
+.lf-alcove[data-surface="card"]  { --lf-alcove-max: 340px; }
+/* NOT `none`: this value is fed to `calc(var(--lf-alcove-max) / ratio)` above,
+   and `calc(none / 1.18)` is invalid — Chrome resolved the whole inline-size
+   to 0 and EVERY product card on the site rendered with no photograph. The
+   uncapped case is spelled as the same large sentinel the var() default uses. */
+@media (min-width:680px) { .lf-alcove[data-surface="card"] { --lf-alcove-max: 9999px; } }
+.lf-alcove[data-surface="hero"]  { --lf-alcove-max: clamp(420px, 64svh, 660px); }
+.lf-alcove[data-surface="pdp"]   { --lf-alcove-max: min(74vh, 640px); }
+.lf-alcove[data-surface="thumb"] { --lf-alcove-max: 72px; }
+.lf-alcove[data-surface="row"]   { --lf-alcove-max: 88px; }
+
+/* ============================================================================
+   7. UTILITIES
    ========================================================================== */
 .lf-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 .lf-rupee::before { content: "\20B9"; margin-right: 0.08em; }
@@ -288,28 +500,13 @@ a:hover { color: var(--lf-gold-ink-hv); }
   overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
 }
 
-/* THE section rule. One line of gold under every h2 on the site. */
-.lf-rule { height:1px; border:0; background: var(--lf-rule-gold); width:100%; }
-
-/* Image mat: every product image lives in one of these */
-.lf-media {
-  position: relative; overflow: hidden;
-  background: var(--lf-surface-sunken);
-  border-radius: var(--lf-r-field);
-  box-shadow: inset 0 0 0 1px var(--lf-hairline);
-}
-.lf-media > img { width:100%; height:100%; object-fit:cover; }
-.lf-media[data-fit="contain"] > img { object-fit: contain; padding: 8%; }
-.lf-ar-1x1 { aspect-ratio: 1 / 1; }
-.lf-ar-4x5 { aspect-ratio: 4 / 5; }
-.lf-ar-21x9 { aspect-ratio: 21 / 9; }
-
-/* Translucent chrome — nav and sticky bars only. Never inside a list. */
+/* Translucent chrome — nav and sticky bars ONLY (§2.8, P6). Never inside a
+   scrolling list. Nothing position:fixed may nest inside it: a
+   backdrop-filtered ancestor becomes a containing block for fixed children. */
 .lf-glass {
-  background: var(--lf-surface-glass);
+  background: var(--lf-paper-glass);
   -webkit-backdrop-filter: var(--lf-blur);
   backdrop-filter: var(--lf-blur);
-  box-shadow: var(--lf-e-edge);
   isolation: isolate;           /* keeps the compositing layer stable */
   transform: translateZ(0);
 }
@@ -319,12 +516,9 @@ a:hover { color: var(--lf-gold-ink-hv); }
   backdrop-filter: var(--lf-blur);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .lf-glass { background: #FDFBF9; }
-  .lf-sheet-glass { background: #FDFBF9; }
-  html[data-theme="dark"] .lf-glass,
-  html[data-theme="dark"] .lf-sheet-glass { background: #121110; }
+  .lf-glass, .lf-sheet-glass { background: #F6EFE4; }
 }
-@media (prefers-reduced-transparency: reduce) {
+@media (prefers-reduced-transparency: reduce) {   /* A10 */
   .lf-glass, .lf-sheet-glass {
     background: var(--lf-canvas);
     -webkit-backdrop-filter: none; backdrop-filter: none;
@@ -343,14 +537,31 @@ html[data-glass="off"] .lf-sheet-glass {
   overflow-x: auto; overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory; scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-  scroll-padding-inline: var(--lf-4);
+  scroll-padding-inline: var(--lf-gutter);
 }
 .lf-rail > * { scroll-snap-align: start; flex: 0 0 auto; }
+
+/* DEPRECATED (§2.10, §10.3) — the pre-ALCOVE image mat, kept only so the
+   surfaces not yet migrated to <Alcove> keep laying out during the sweep.
+   The `data-fit="contain"` branch is DELETED outright: the masters are RGB
+   with no alpha and six disagreeing grounds, so `contain` paints a cyan,
+   pink or deep-blue rectangle inside a warm frame — the exact defect visible
+   in plp-desk.png. Nothing new may use these; use <Alcove>. */
+.lf-media {
+  position: relative; overflow: hidden;
+  background: var(--lf-mat);
+  border-radius: var(--lf-r-field);
+  box-shadow: inset 0 0 0 1px var(--lf-hairline);
+}
+.lf-media > img { width:100%; height:100%; object-fit:cover; }
+.lf-ar-1x1 { aspect-ratio: 1 / 1; }
+.lf-ar-4x5 { aspect-ratio: 4 / 5; }
+.lf-ar-21x9 { aspect-ratio: 21 / 9; }
 
 .lf-safe-bottom { padding-bottom: calc(var(--lf-4) + env(safe-area-inset-bottom, 0px)); }
 .lf-above-bar { bottom: calc(var(--lf-4) + var(--lf-bar-h) + env(safe-area-inset-bottom, 0px)); }
 
-/* The press gesture. Scale by surface size so nothing visibly distorts. */
+/* §3.12 — the press gesture, scaled by surface size so nothing distorts. */
 .lf-press       { transition: transform var(--lf-dur-1) var(--lf-ease); }
 .lf-press:active            { transform: scale(0.972); }  /* button, chip, icon */
 .lf-press[data-press="card"]:active { transform: scale(0.985); }
@@ -358,29 +569,39 @@ html[data-glass="off"] .lf-sheet-glass {
 .lf-press[data-press="panel"]:active{ transform: none; opacity: 0.94; } /* >320px */
 
 /* ============================================================================
-   6. SKELETONS
+   8. SKELETONS — P5: they lay out at the real element's final size.
    ========================================================================== */
 @keyframes lf-shimmer { from { transform: translate3d(-100%,0,0); } to { transform: translate3d(100%,0,0); } }
 @keyframes lf-pulse   { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
 
 .lf-skel {
   position: relative; overflow: hidden;
-  background: var(--lf-surface-quiet);
+  background: var(--lf-quiet);
   border-radius: var(--lf-r-chip);
 }
-.lf-skel--text { animation: lf-pulse 1400ms var(--lf-ease-inout) infinite; }
+.lf-skel--text { animation: lf-pulse 1400ms var(--lf-ease) infinite; }
 .lf-skel--media::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(100deg,
-    rgba(255,255,255,0) 20%,
-    rgba(255,255,255,0.62) 50%,
-    rgba(255,255,255,0) 80%);
+    rgba(255,252,246,0) 20%,
+    rgba(255,252,246,0.62) 50%,
+    rgba(255,252,246,0) 80%);
   animation: lf-shimmer 1400ms linear infinite;
 }
 html[data-glass="off"] .lf-skel--media::after { animation: none; content: none; }
 
+/* The niche-shaped skeleton: a card placeholder must occupy the arch, or the
+   first paint and the loaded paint are different shapes (CLS ≤ 0.05). */
+.lf-skel--alcove {
+  aspect-ratio: 1 / var(--lf-arch-ratio);
+  border-radius: var(--lf-r-arch);
+}
+
 /* ============================================================================
-   7. REDUCED MOTION — behavioural, not just durational
+   9. REDUCED MOTION — §2.31 / A9: BEHAVIOURAL, not just durational.
+   Where a hover/focus gesture is removed, the affordance SURVIVES: the ledge
+   beneath the item thickens 2px → 3px. (The name's underline is the card's
+   own responsibility — §6.2 item 4.) Better than zeroing the transition.
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
   :root {
@@ -393,30 +614,41 @@ html[data-glass="off"] .lf-skel--media::after { animation: none; content: none; 
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
   }
+  /* Opacity crossfades survive, capped at 120ms (§3.12). */
+  [data-motion="crossfade"] { transition-duration: 120ms !important; }
   html, .lf-rail { scroll-behavior: auto !important; }
   .lf-skel--text  { animation: none; opacity: 1; }
   .lf-skel--media::after { animation: none; content: none; }
   .lf-press:active, .lf-press[data-press]:active { transform: none; }
-  /* Overlays and drawers appear in place rather than travelling */
+  /* The photograph does not travel... */
+  .lf-alcove > .lf-alcove-img,
+  [data-stock]:hover .lf-alcove > .lf-alcove-img,
+  [data-stock]:focus-within .lf-alcove > .lf-alcove-img { transform: none !important; }
+  /* ...but the affordance is preserved on the ledge beneath it. */
+  [data-stock]:hover .lf-ledge,
+  [data-stock]:focus-within .lf-ledge { height: 3px; }
+  /* Overlays and drawers appear in place rather than travelling. */
   [data-motion="enter"] { transform: none !important; }
 }
 
 /* ============================================================================
-   8. HIGH CONTRAST
+   10. HIGH CONTRAST
    ========================================================================== */
 @media (prefers-contrast: more) {
   :root {
-    --lf-hairline: rgba(20,17,15,0.24);
-    --lf-border: rgba(20,17,15,0.34);
+    --lf-hairline: rgba(26,20,16,0.24);
+    --lf-border: rgba(26,20,16,0.34);
     --lf-ink-3: #514A41;
   }
   *:focus-visible { outline-width: 3px; }
 }
 
 /* ============================================================================
-   9. HOVER GUARD — every hover style in the app lives inside this query.
-      A tap must never leave a control stuck in its hover state.
+   11. HOVER GUARD — §10.14. Every hover style in the app lives inside a
+   (hover: hover) query, so a tap can never leave a control stuck in its
+   hover state, and nothing is ever HIDDEN behind :hover.
    ========================================================================== */
 @media (hover: none) {
   .lf-media > img { transform: none !important; }
+  .lf-alcove > .lf-alcove-img { transform: none; }
 }

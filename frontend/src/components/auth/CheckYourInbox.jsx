@@ -27,12 +27,23 @@
  *
  * ALSO EXPORTED: `AuthPanel`
  * The five auth routes (Login, SignUp, VerifyEmail, ForgotPassword,
- * ResetPassword) need one identical centred card. WP-12 owns exactly thirteen
+ * ResetPassword) need one identical card. WP-12 owns exactly thirteen
  * files and may not add a fourteenth, and five hand-copied layouts is how the
  * previous build ended up with three different page paddings, so the shell lives
  * here next to its heaviest consumer — the same reason `EmptyState.jsx` exports
  * `FOCUS_RING_SX`. If a later change may add `components/auth/AuthPanel.jsx`,
  * move it there and re-point the five importers; nothing else changes.
+ *
+ * ART_DIRECTION §5.8, which this revision applies:
+ *   "Auth (/login, /signup, /verify-email, /forgot-password) — UTILITY, single
+ *    column capped at 420px, --lf-paper panel on --lf-canvas, --lf-border-field
+ *    on every input (SC 1.4.11), one 48px ink primary, one text escape. No
+ *    marketing copy, no product rail, no social proof."
+ * So: the `width="sm"` escape hatch is gone (SignUp's two-up field row with it),
+ * the panel is `--lf-paper` on `--lf-canvas` at the §3.1 1.115:1 step, the page
+ * rhythm is the UTILITY archetype's `var(--lf-sect)`, and the title is §5.9's
+ * `h3 component="h1"`, left. `--lf-border-field` arrives from `theme.js`'s
+ * `MuiOutlinedInput` override, so no page sets an input border by hand.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -50,7 +61,13 @@ import MarkEmailReadOutlinedIcon from '@mui/icons-material/MarkEmailReadOutlined
 import ReportGmailerrorredOutlinedIcon from '@mui/icons-material/ReportGmailerrorredOutlined';
 
 import { getApiErrorMessage, resendVerification } from '../../services/api';
-import { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../common/EmptyState';
+import {
+  ARCHETYPE_PY,
+  FOCUS_RING_SX,
+  PRIMARY_ACTION_SX,
+  StateIcon,
+  TOUCH_TARGET_SX,
+} from '../common/EmptyState';
 import SupportLink from '../common/SupportLink';
 
 /** Matches `ResendVerificationThrottle.min_interval_seconds`. */
@@ -62,42 +79,51 @@ export const RESEND_MAX_ATTEMPTS = 3;
  * The shared auth card.
  * ------------------------------------------------------------------ */
 
+/** §5.8 — the auth column is capped here and nowhere else. */
+export const AUTH_COLUMN_MAX = 420;
+
 /**
  * @param {object} props
- * @param {string} props.title Page heading. Rendered as `h1` — these are routes.
- * @param {React.ReactNode} [props.subtitle] One line under the heading.
+ * @param {string} props.title Page heading. §5.9's UTILITY register: `h3` as `h1`.
+ * @param {React.ReactNode} [props.subtitle] One line under the heading. Never
+ *   marketing copy — §5.8 bans it on these four routes.
  * @param {React.ReactNode} [props.children] The form or the state.
  * @param {React.ReactNode} [props.footer] Links under the card (sign in / sign up).
- * @param {'xs'|'sm'} [props.width='xs'] `sm` for the two-column signup form.
  * @param {object} [props.sx]
  */
-export const AuthPanel = ({ title, subtitle, children, footer, width = 'xs', sx }) => (
-  <Container component="main" maxWidth={width} sx={{ py: { xs: 5, md: 8 }, px: 2, ...sx }}>
-    <Box sx={{ textAlign: 'center', mb: 3 }}>
-      <Typography variant="h3" component="h1" sx={{ color: 'var(--lf-ink)' }}>
-        {title}
-      </Typography>
-      {subtitle ? (
-        <Typography variant="body1" sx={{ mt: 1.5, color: 'var(--lf-ink-2)' }}>
-          {subtitle}
-        </Typography>
-      ) : null}
-    </Box>
-
-    <Paper
-      elevation={0}
-      sx={{
-        p: { xs: 2.5, sm: 4 },
-        backgroundColor: 'var(--lf-surface)',
-        border: '1px solid var(--lf-hairline)',
-        borderRadius: 'var(--lf-r-panel)',
-      }}
+export const AuthPanel = ({ title, subtitle, children, footer, sx }) => (
+  <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: ARCHETYPE_PY.utility }}>
+    <Container
+      component="main"
+      maxWidth={false}
+      sx={{ maxWidth: AUTH_COLUMN_MAX, ...sx }}
     >
-      {children}
-    </Paper>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h3" component="h1" sx={{ color: 'var(--lf-ink)' }}>
+          {title}
+        </Typography>
+        {subtitle ? (
+          <Typography variant="body1" sx={{ mt: 1.5, color: 'var(--lf-ink-2)' }}>
+            {subtitle}
+          </Typography>
+        ) : null}
+      </Box>
 
-    {footer ? <Box sx={{ mt: 3 }}>{footer}</Box> : null}
-  </Container>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, sm: 3.5 },
+          backgroundColor: 'var(--lf-paper)',
+          border: '1px solid var(--lf-hairline)',
+          borderRadius: 'var(--lf-r-panel)',
+        }}
+      >
+        {children}
+      </Paper>
+
+      {footer ? <Box sx={{ mt: 3 }}>{footer}</Box> : null}
+    </Container>
+  </Box>
 );
 
 /* ------------------------------------------------------------------ *
@@ -199,23 +225,9 @@ const CheckYourInbox = ({
 
   return (
     <Box sx={{ textAlign: 'center', ...sx }}>
-      <Box
-        aria-hidden="true"
-        sx={{
-          width: 64,
-          height: 64,
-          mx: 'auto',
-          mb: 2.5,
-          borderRadius: 'var(--lf-r-pill)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: failed ? 'var(--lf-warn-tint)' : 'var(--lf-gold-tint)',
-          '& > svg': { fontSize: 28, color: failed ? 'var(--lf-warn-ink)' : 'var(--lf-gold-ink)' },
-        }}
-      >
+      <StateIcon tone={failed ? 'warn' : 'gold'}>
         {failed ? <ReportGmailerrorredOutlinedIcon /> : <MarkEmailReadOutlinedIcon />}
-      </Box>
+      </StateIcon>
 
       <Typography
         ref={headingRef}
@@ -272,11 +284,26 @@ const CheckYourInbox = ({
           fullWidth
           aria-disabled={blocked}
           onClick={handleResend}
-          startIcon={sending ? <CircularProgress size={16} color="inherit" /> : null}
+          startIcon={sending ? <CircularProgress size={16} thickness={3.6} color="inherit" /> : null}
           sx={{
-            ...TOUCH_TARGET_SX,
+            ...PRIMARY_ACTION_SX,
             ...FOCUS_RING_SX,
-            ...(blocked ? { opacity: 0.6, cursor: 'default' } : {}),
+            /* A4/A5: `aria-disabled`, never `disabled`, and the recessive state is
+               §3.2's disabled pair (--lf-ink-3 on --lf-quiet, 4.65:1) rather than an
+               opacity wash that drags the label under 4.5:1. The reason is stated
+               adjacent, below, which is what licenses the inert look at all. */
+            ...(blocked
+              ? {
+                  cursor: 'default',
+                  color: 'var(--lf-ink-3)',
+                  backgroundColor: failed ? 'var(--lf-quiet)' : 'transparent',
+                  borderColor: 'var(--lf-border-strong)',
+                  '&:hover': {
+                    backgroundColor: failed ? 'var(--lf-quiet)' : 'transparent',
+                    borderColor: 'var(--lf-border-strong)',
+                  },
+                }
+              : {}),
           }}
         >
           {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend verification email'}
@@ -292,7 +319,7 @@ const CheckYourInbox = ({
             component={RouterLink}
             to={primary.to}
             state={primary.state}
-            sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+            sx={{ ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
           >
             {primary.label}
           </Button>

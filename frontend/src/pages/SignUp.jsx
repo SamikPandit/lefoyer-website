@@ -42,7 +42,7 @@ import Typography from '@mui/material/Typography';
 
 import SeoHead from '../components/common/SeoHead';
 import CheckYourInbox, { AuthPanel } from '../components/auth/CheckYourInbox';
-import { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../components/common/EmptyState';
+import { FOCUS_RING_SX, PRIMARY_ACTION_SX } from '../components/common/EmptyState';
 import { getApiErrorMessage, registerUser } from '../services/api';
 import { useBrand } from '../content/brand';
 
@@ -209,7 +209,7 @@ const SignUp = () => {
         canonical="/signup"
         noindex
       />
-      <AuthPanel title="Create an account" width="sm" footer={signInLink}>
+      <AuthPanel title="Create an account" footer={signInLink}>
         <Box component="form" onSubmit={handleSubmit} noValidate>
           {banner ? (
             <Alert severity="error" role="alert" sx={{ mb: 2.5 }}>
@@ -218,7 +218,7 @@ const SignUp = () => {
           ) : null}
 
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 id="first_name"
@@ -231,7 +231,7 @@ const SignUp = () => {
                 helperText={fieldErrors.first_name || ' '}
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 id="last_name"
@@ -261,7 +261,7 @@ const SignUp = () => {
                 }
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 required
                 fullWidth
@@ -279,7 +279,7 @@ const SignUp = () => {
                 helperText={fieldErrors.password || `At least ${PASSWORD_MIN_LENGTH} characters.`}
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 required
                 fullWidth
@@ -381,7 +381,7 @@ const SignUp = () => {
             disableElevation
             aria-disabled={loading}
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : null}
-            sx={{ mt: 3, py: 1.5, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+            sx={{ mt: 3, ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
           >
             {loading ? 'Creating your account…' : 'Create account'}
           </Button>

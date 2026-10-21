@@ -24,14 +24,21 @@
  * was replaced in 2013, so the sentence is either wrong or about a different
  * company, and repeating a specific statutory fact we cannot verify is worse than
  * omitting it. No name was guessed, invented or swapped.
+ *
+ * §5.9 ARCHETYPE NOTE: the table names About, Contact, Help and the 404 as EDITORIAL and
+ * the seven transactional routes as UTILITY; the three legal pages are in neither list.
+ * They are long-form prose under one `h1` at a reading measure, which is what EDITORIAL
+ * describes, so they take EDITORIAL — the `variant="h1"` title they already used, left
+ * now, on `py: var(--lf-sect-lg)` from `<PageShell>` instead of a fifth bespoke `py`
+ * pair. Reported as an ambiguity rather than decided silently.
  */
 
-import { Box, Container, Stack, Typography } from '@mui/material';
+import { Box, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
 import SeoHead from '../components/common/SeoHead';
 import SupportLink from '../components/common/SupportLink';
-import { FOCUS_RING_SX } from '../components/common/EmptyState';
+import { FOCUS_RING_SX, PageShell } from '../components/common/EmptyState';
 import { useBrand } from '../content/brand';
 
 /**
@@ -97,21 +104,21 @@ const TermsAndConditions = () => {
         canonical="/terms"
       />
 
-      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 6, md: 10 } }}>
-        <Container maxWidth="md">
-          <Box sx={{ textAlign: 'center', mb: { xs: 4, md: 6 } }}>
-            <Typography variant="h1" component="h1" sx={{ color: 'var(--lf-ink)', mb: 1.5 }}>
-              Terms &amp; conditions
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
-              Last updated: {LAST_UPDATED}
-            </Typography>
-          </Box>
+      <PageShell
+        archetype="editorial"
+        maxWidth="md"
+        title={<>Terms &amp; conditions</>}
+        intro={
+          <Typography variant="body2" component="span" sx={{ color: 'var(--lf-ink-3)' }}>
+            Last updated: {LAST_UPDATED}
+          </Typography>
+        }
+      >
 
           <Box
             sx={{
               p: { xs: 3, md: 5 },
-              backgroundColor: 'var(--lf-surface)',
+              backgroundColor: 'var(--lf-paper)',
               border: '1px solid var(--lf-hairline)',
               borderRadius: 'var(--lf-r-panel)',
             }}
@@ -271,7 +278,7 @@ const TermsAndConditions = () => {
             </Stack>
           </Box>
 
-          <Typography variant="body2" sx={{ mt: 3, textAlign: 'center', color: 'var(--lf-ink-3)' }}>
+          <Typography variant="body2" sx={{ mt: 3, color: 'var(--lf-ink-3)' }}>
             See also our{' '}
             <Box
               component={RouterLink}
@@ -282,8 +289,7 @@ const TermsAndConditions = () => {
             </Box>
             .
           </Typography>
-        </Container>
-      </Box>
+      </PageShell>
     </>
   );
 };

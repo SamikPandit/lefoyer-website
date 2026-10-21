@@ -120,7 +120,13 @@ fi
 say "3 · Build the frontend"
 # ---------------------------------------------------------------------------
 pushd "$REPO_ROOT/frontend" >/dev/null
-[[ -d node_modules ]] || npm ci
+# `npm ci` UNCONDITIONALLY. The old `[[ -d node_modules ]] ||` guard installed only when
+# node_modules was absent, so a host that already had one from a previous deploy would skip
+# the install — and the build now has a `prebuild` step (scripts/optimize-images.mjs) plus a
+# new `sharp` devDependency that such a host does not have. The deploy would fail at the
+# prebuild hook, after the backup and the migration rehearsal. npm ci is idempotent and reads
+# the lockfile, which changed in this release.
+npm ci
 VITE_API_URL="${VITE_API_URL:-https://www.lefoyerglobal.com/api/}" \
 VITE_SITE_URL="${VITE_SITE_URL:-https://www.lefoyerglobal.com}" \
   npm run build

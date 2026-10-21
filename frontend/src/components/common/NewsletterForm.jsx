@@ -102,6 +102,13 @@ export function firstServerMessage(data, ...keys) {
  */
 const NewsletterForm = ({
   variant = 'inline',
+  /* §5.11 / §2.18 — the ONE newsletter on the site is the footer's, and its
+     `Join` is LICENSED GOLD FILL 2 of 2. theme.js carries that as the
+     `brandFill` Button variant; this prop is how the footer asks for it
+     without forking a second newsletter (§10.23). Everything else keeps the
+     ink `contained` default. Integration step: this replaces the scoped sx
+     bridge Footer.jsx used to paint the button with. */
+  buttonVariant = 'contained',
   source = 'footer',
   title,
   description,
@@ -287,10 +294,10 @@ const NewsletterForm = ({
               minWidth: 0,
               '& .MuiOutlinedInput-root': {
                 minHeight: 44,
-                backgroundColor: 'var(--lf-surface, #FFFFFF)',
+                backgroundColor: 'var(--lf-paper)',
               },
               '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'var(--lf-border-field, #8A8178)',
+                borderColor: 'var(--lf-border-field)',
               },
               '& .MuiFormHelperText-root': { marginLeft: 0 },
             }}
@@ -299,8 +306,7 @@ const NewsletterForm = ({
           <Button
             className="lf-press"
             type="submit"
-            variant="contained"
-            color="primary"
+            variant={buttonVariant}
             disableElevation
             disabled={submitting}
             sx={{

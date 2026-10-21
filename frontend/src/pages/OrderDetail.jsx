@@ -1,4 +1,5 @@
 /**
+ * ============================================================================
  * OrderDetail — one order, in full.
  *
  * WHAT WAS BROKEN (C-19, C-20, C-24 and the tracking bug)
@@ -18,7 +19,25 @@
  *  - `navigate(order.shipment.tracking_url)` handed an absolute external Blue
  *    Dart URL to react-router, which rendered the SPA's 404. It opens in a new
  *    tab (`openTracking`).
- */
+ *
+ * ALCOVE (ART_DIRECTION.md §3.11, §5.9, §6.1, §7.3) — PRESENTATION ONLY:
+ *  - **The 4-column `<Table>` is now a line list**, each row a niche + the
+ *    name + `₹price × qty` + the line total. The table needed a horizontal
+ *    scroller at 320px to show four columns of an itemisation that is really
+ *    one fact per line, and its 48px raw `<img>` loaded a 2048px master. The
+ *    list is the same shape the cart and the confirmation use, so an order
+ *    looks like the thing it is at every width.
+ *  - Panels carry no shadow and no `--lf-e-edge` inset highlight (§3.11), and
+ *    the legacy `--lf-surface*` aliases are gone from this file.
+ *  - The UTILITY archetype (§5.9): `h3` as the `h1`, left aligned,
+ *    `py: var(--lf-sect)`. §5.9's table names its siblings — Orders, Cart,
+ *    Confirmation — and this page is the same kind reached from the same menu,
+ *    so it takes the same archetype rather than a sixth heading size.
+ *  - The status chips take the theme's measured semantic variants (§3.4).
+ *
+ * Nothing about the payment state machine, the retry dialog or the cart
+ * restore is touched.
+ * ========================================================================== */
 
 import { useCallback, useEffect, useState } from 'react';
 import Alert from '@mui/material/Alert';
@@ -31,22 +50,16 @@ import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
-import PaymentOutlinedIcon from '@mui/icons-material/PaymentOutlined';
 import ReplayIcon from '@mui/icons-material/Replay';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import SeoHead from '../components/common/SeoHead';
 import SupportLink from '../components/common/SupportLink';
 import ErrorState from '../components/common/ErrorState';
+import Alcove from '../components/common/Alcove';
 import { formatMoney } from '../components/cart/CartTotals';
 import OrderTimeline from '../components/order/OrderTimeline';
 import PaymentCompletionDialog from '../components/order/PaymentCompletionDialog';
@@ -54,23 +67,26 @@ import {
   formatOrderDate,
   openTracking,
   orderRef,
-  paymentChipColor,
-  statusChipColor,
+  paymentChipVariant,
+  statusChipVariant,
 } from '../components/order/OrderCard';
 import { useCart } from '../context/CartContext';
 import { getApiErrorMessage, getOrder, restoreCartFromOrder } from '../services/api';
 import { usePolicy } from '../content/policy';
 
+/** §3.10 — the `thumb` surface caps the niche at 72px of height. */
+const THUMB_NICHE_W = 'calc(72px / var(--lf-arch-ratio))';
+
 const Panel = ({ title, children, sx, ...rest }) => (
   <Box
     // `sx` is MERGED, not spread after: `{...rest}` carrying an `sx` would
     // replace the whole style object and silently drop the panel chrome.
+    // §3.11: a panel is not a floating thing, so it carries no elevation.
     sx={{
       p: { xs: 2, md: 3 },
       borderRadius: 'var(--lf-r-panel)',
       border: '1px solid var(--lf-hairline)',
-      backgroundColor: 'var(--lf-surface)',
-      boxShadow: 'var(--lf-e-edge), var(--lf-e1)',
+      backgroundColor: 'var(--lf-paper)',
       ...sx,
     }}
     {...rest}
@@ -97,6 +113,80 @@ const KeyValue = ({ label, value, tone }) => (
     </Typography>
   </Box>
 );
+
+/**
+ * One ordered line. The order's own `product_name` / `product_sku` /
+ * `product_image` snapshots win over the live product, so a renamed or
+ * re-SKU'd product never rewrites what the customer bought; the name beside
+ * the niche is the row's link, so the photograph takes `alt=""` (§7.3).
+ */
+const OrderLine = ({ item, last }) => {
+  const lineProduct = {
+    ...(item.product || {}),
+    name: item.product_name || item.product?.name || '',
+    image_main: item.product?.image_main || item.product_image || null,
+  };
+  const href = item.product_slug ? `/product/${item.product_slug}` : null;
+
+  return (
+    <Box
+      component="li"
+      sx={{
+        listStyle: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        py: 2,
+        minWidth: 0,
+        borderBottom: last ? 'none' : '1px solid var(--lf-hairline)',
+      }}
+    >
+      <Box sx={{ flex: 'none', width: THUMB_NICHE_W }}>
+        <Alcove product={lineProduct} surface="thumb" alt="" />
+      </Box>
+
+      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+        {href ? (
+          <Typography
+            variant="h6"
+            component={RouterLink}
+            to={href}
+            sx={{
+              color: 'var(--lf-ink)',
+              textDecoration: 'none',
+              display: 'block',
+              '@media (hover:hover)': { '&:hover': { textDecoration: 'underline' } },
+            }}
+          >
+            {lineProduct.name}
+          </Typography>
+        ) : (
+          <Typography variant="h6" component="p" sx={{ color: 'var(--lf-ink)' }}>
+            {lineProduct.name}
+          </Typography>
+        )}
+        <Typography
+          variant="caption"
+          component="p"
+          data-tnum="true"
+          sx={{ color: 'var(--lf-ink-3)' }}
+        >
+          {formatMoney(item.price)} × {item.quantity}
+          {item.product_sku ? ` · ${item.product_sku}` : ''}
+        </Typography>
+      </Box>
+
+      <Typography
+        variant="price"
+        component="p"
+        data-tnum="true"
+        sx={{ color: 'var(--lf-ink)', whiteSpace: 'nowrap' }}
+      >
+        {formatMoney(item.line_total)}
+      </Typography>
+    </Box>
+  );
+};
 
 const OrderDetail = () => {
   const { id } = useParams();
@@ -159,10 +249,10 @@ const OrderDetail = () => {
 
   if (loading && !order) {
     return (
-      <Container maxWidth="lg" sx={{ py: 8 }}>
+      <Container maxWidth="lg" sx={{ py: 'var(--lf-sect)' }}>
         <SeoHead title="Your order" noindex />
         <Stack spacing={2} alignItems="center">
-          <CircularProgress size={28} />
+          <CircularProgress size={28} thickness={3.6} />
           <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
             Loading your order…
           </Typography>
@@ -173,7 +263,7 @@ const OrderDetail = () => {
 
   if (error || !order) {
     return (
-      <Container maxWidth="sm" sx={{ py: 8 }}>
+      <Container maxWidth="sm" sx={{ py: 'var(--lf-sect)' }}>
         <SeoHead title="Your order" noindex />
         <ErrorState
           variant="page"
@@ -195,9 +285,10 @@ const OrderDetail = () => {
   const awaitingPayment = ['PENDING', 'FAILED'].includes(paymentStatus);
   const canRetry = order.can_retry === true || (order.can_retry === undefined && awaitingPayment);
   const shipment = order.shipment;
+  const isCOD = String(order.payment_method || '').toUpperCase() === 'COD';
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 4, md: 7 } }}>
+    <Container maxWidth="lg" sx={{ py: 'var(--lf-sect)' }}>
       <SeoHead title={`Order ${orderRef(order)}`} noindex description="Your order details." />
 
       <Button
@@ -227,17 +318,15 @@ const OrderDetail = () => {
             </Typography>
           )}
           <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
-            <Chip label={order.status || 'Awaiting payment'} color={statusChipColor(order.status)} />
             <Chip
-              variant="outlined"
-              icon={<PaymentOutlinedIcon />}
+              label={order.status || 'Awaiting payment'}
+              variant={statusChipVariant(order.status)}
+            />
+            <Chip
               label={paymentStatus || 'PENDING'}
-              color={paymentChipColor(paymentStatus)}
+              variant={paymentChipVariant(paymentStatus)}
             />
-            <Chip
-              variant="outlined"
-              label={order.payment_method === 'COD' ? 'Cash on delivery' : 'Paid online'}
-            />
+            <Chip label={isCOD ? 'Cash on delivery' : 'Paid online'} variant="outlined" />
           </Stack>
         </Box>
 
@@ -286,7 +375,7 @@ const OrderDetail = () => {
               variant="outlined"
               onClick={handleRestoreCart}
               disabled={restoring}
-              startIcon={restoring ? <CircularProgress size={16} /> : null}
+              startIcon={restoring ? <CircularProgress size={16} thickness={3.6} /> : null}
             >
               Restore my cart
             </Button>
@@ -298,70 +387,14 @@ const OrderDetail = () => {
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 8 }}>
           <Panel title="Items">
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Product</TableCell>
-                    <TableCell align="center">Qty</TableCell>
-                    <TableCell align="right">Price</TableCell>
-                    <TableCell align="right">Line total</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <Stack direction="row" spacing={1.5} alignItems="center">
-                          <Box
-                            component="img"
-                            src={item.product_image || ''}
-                            alt={item.product_name || ''}
-                            data-product="true"
-                            loading="lazy"
-                            sx={{
-                              width: 48,
-                              height: 48,
-                              objectFit: 'cover',
-                              borderRadius: 'var(--lf-r-chip)',
-                              backgroundColor: 'var(--lf-surface-sunken)',
-                            }}
-                          />
-                          <Box sx={{ minWidth: 0 }}>
-                            {item.product_slug ? (
-                              <Typography
-                                variant="body2"
-                                component={RouterLink}
-                                to={`/product/${item.product_slug}`}
-                                sx={{ color: 'var(--lf-ink)', textDecoration: 'none' }}
-                              >
-                                {item.product_name}
-                              </Typography>
-                            ) : (
-                              <Typography variant="body2">{item.product_name}</Typography>
-                            )}
-                            {item.product_sku && (
-                              <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)', display: 'block' }}>
-                                {item.product_sku}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Stack>
-                      </TableCell>
-                      <TableCell align="center" data-tnum="true">
-                        {item.quantity}
-                      </TableCell>
-                      <TableCell align="right" data-tnum="true">
-                        {formatMoney(item.price)}
-                      </TableCell>
-                      <TableCell align="right" data-tnum="true">
-                        {formatMoney(item.line_total)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            {/* One fact per line, with the niche the product stood in on the
+                shelf. No horizontal scroller at 320px, and every photograph
+                comes through <ProductImage>'s derivatives (§7.3). */}
+            <Box component="ul" sx={{ m: 0, p: 0 }}>
+              {items.map((item, index) => (
+                <OrderLine key={item.id} item={item} last={index === items.length - 1} />
+              ))}
+            </Box>
 
             <Divider sx={{ my: 2 }} />
 
@@ -386,9 +419,11 @@ const OrderDetail = () => {
                   }
                 />
                 <Divider sx={{ my: 1 }} />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="h6">Total</Typography>
-                  <Typography variant="price" data-tnum="true" sx={{ fontWeight: 700 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                  {/* §5.6's wording, kept consistent here: on a cash order
+                      nothing has been paid yet, so it is not called "Paid". */}
+                  <Typography variant="h6">{isCOD ? 'To pay on delivery' : 'Total'}</Typography>
+                  <Typography variant="price" component="p" data-tnum="true">
                     {formatMoney(order.total)}
                   </Typography>
                 </Box>
@@ -422,10 +457,7 @@ const OrderDetail = () => {
             </Panel>
 
             <Panel title="Payment">
-              <KeyValue
-                label="Method"
-                value={order.payment_method === 'COD' ? 'Cash on delivery' : 'Online (PhonePe)'}
-              />
+              <KeyValue label="Method" value={isCOD ? 'Cash on delivery' : 'Online (PhonePe)'} />
               <KeyValue label="State" value={paymentStatus || 'PENDING'} />
               {order.payment_reference && (
                 <KeyValue label="Reference" value={order.payment_reference} />

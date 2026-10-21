@@ -31,9 +31,27 @@
  */
 
 import { effectivePrice as apiEffectivePrice } from '../../services/api';
+import { LOW_STOCK_THRESHOLD, STOCK, schemaAvailability, stockState } from '../../utils/stock';
 
-/** IMPL_SPEC §2d: "Low-stock copy uses one shared constant LOW_STOCK_THRESHOLD = 5." */
-export const LOW_STOCK_THRESHOLD = 5;
+/* --------------------------------------------------------------------------
+ * ART_DIRECTION.md §6.4 — the availability derivation MOVED OUT of this file.
+ *
+ * The docstring above anticipated this: "If a later change is allowed to add
+ * `src/utils/stock.js`, move `stockState` + `priceView` there verbatim and
+ * re-point the five importers." §6.4 is that change, and it is now the single
+ * derivation for the card, the PDP, the search row and the cart line.
+ *
+ * `stockState`, `LOW_STOCK_THRESHOLD` and `schemaAvailability` are re-exported
+ * here, unchanged, so the surfaces that already import them from this module —
+ * `pages/ProductDetail.jsx` — keep compiling against ONE implementation rather
+ * than gaining a second. New call sites import from `utils/stock` directly.
+ *
+ * `priceView` and the money formatter stay here: `ProductListing` and
+ * `ProductFilter` already import `formatRupees` from this module, and §6.3's
+ * <PriceBlock> re-exports them from the component so "PriceBlock's formatter"
+ * (§6.8) has one honest address. One implementation, two export points.
+ * -------------------------------------------------------------------------- */
+export { LOW_STOCK_THRESHOLD, STOCK, schemaAvailability, stockState };
 
 /** The listing's own page size. `count / PAGE_SIZE` is the real page count (LF-09). */
 export const PRODUCT_PAGE_SIZE = 24;
@@ -111,87 +129,6 @@ export function priceView(product, options = {}) {
     showSavings: Boolean(sellable && savingsPercent && savingsPercent > 0),
     hasPrice,
   };
-}
-
-/* -------------------------------------------------------------------------- *
- * availability — IMPL_SPEC §2d, one derivation
- * -------------------------------------------------------------------------- */
-
-/**
- * @typedef {object} StockState
- * @property {'coming_soon'|'out'|'low'|'in'} state
- * @property {string} label Words, always — never colour alone (DESIGN_SYSTEM §7).
- * @property {string} dotColor A `var(--lf-*)` token.
- * @property {string} textColor A `var(--lf-*)` token.
- * @property {boolean} sellable `product.in_stock === true`, and nothing else.
- * @property {number} maxQty `available_quantity`, floored at 0.
- * @property {boolean} notifiable Show "Notify me" in place of Add to Cart (§2d).
- */
-
-/**
- * The single availability derivation for card, PDP, wishlist and related rail.
- * @param {object} product
- * @returns {StockState}
- */
-export function stockState(product) {
-  const comingSoon = product?.coming_soon === true;
-  // §2d: `in_stock === true` is the whole test. No `stock_quantity` fallback.
-  const sellable = product?.in_stock === true && !comingSoon;
-  const rawQty = Number(product?.available_quantity);
-  const maxQty = Number.isFinite(rawQty) && rawQty > 0 ? Math.trunc(rawQty) : 0;
-
-  if (comingSoon) {
-    return {
-      state: 'coming_soon',
-      label: 'Coming soon',
-      dotColor: 'var(--lf-gold-edge)',
-      textColor: 'var(--lf-gold-ink)',
-      sellable: false,
-      maxQty: 0,
-      notifiable: true,
-    };
-  }
-
-  if (!sellable || maxQty <= 0) {
-    return {
-      state: 'out',
-      label: 'Out of stock',
-      dotColor: 'var(--lf-ink-4)',
-      textColor: 'var(--lf-ink-3)',
-      sellable: false,
-      maxQty: 0,
-      notifiable: true,
-    };
-  }
-
-  if (maxQty <= LOW_STOCK_THRESHOLD) {
-    return {
-      state: 'low',
-      label: maxQty === 1 ? 'Only 1 left' : `Only ${maxQty} left`,
-      dotColor: 'var(--lf-warn-ink)',
-      textColor: 'var(--lf-warn-ink)',
-      sellable: true,
-      maxQty,
-      notifiable: false,
-    };
-  }
-
-  return {
-    state: 'in',
-    label: 'In stock',
-    dotColor: 'var(--lf-ok)',
-    textColor: 'var(--lf-ok-ink)',
-    sellable: true,
-    maxQty,
-    notifiable: false,
-  };
-}
-
-/** schema.org availability for the SAME `in_stock` the page renders (LF-07). */
-export function schemaAvailability(product) {
-  const stock = stockState(product);
-  if (stock.state === 'coming_soon') return 'https://schema.org/PreOrder';
-  return stock.sellable ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
 }
 
 /* -------------------------------------------------------------------------- *

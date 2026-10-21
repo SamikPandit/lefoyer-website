@@ -34,31 +34,16 @@ import LinkOffOutlinedIcon from '@mui/icons-material/LinkOffOutlined';
 import SeoHead from '../components/common/SeoHead';
 import { AuthPanel } from '../components/auth/CheckYourInbox';
 import SupportLink from '../components/common/SupportLink';
-import { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../components/common/EmptyState';
+import {
+  FOCUS_RING_SX,
+  PRIMARY_ACTION_SX,
+  StateIcon,
+  TOUCH_TARGET_SX,
+} from '../components/common/EmptyState';
 import { confirmPasswordReset, getApiErrorMessage } from '../services/api';
 
 /** `SetNewPasswordSerializer`: `new_password = CharField(min_length=8)`. */
 const PASSWORD_MIN_LENGTH = 8;
-
-const StateIcon = ({ children, tint, ink }) => (
-  <Box
-    aria-hidden="true"
-    sx={{
-      width: 64,
-      height: 64,
-      mx: 'auto',
-      mb: 2.5,
-      borderRadius: 'var(--lf-r-pill)',
-      backgroundColor: tint,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      '& > svg': { fontSize: 28, color: ink },
-    }}
-  >
-    {children}
-  </Box>
-);
 
 const ResetPassword = () => {
   const { uid, token } = useParams();
@@ -128,7 +113,7 @@ const ResetPassword = () => {
         <SeoHead title="Password updated" canonical="/reset-password" noindex />
         <AuthPanel title="Password updated">
           <Box sx={{ textAlign: 'center' }}>
-            <StateIcon tint="var(--lf-ok-tint)" ink="var(--lf-ok-ink)">
+            <StateIcon tone="ok">
               <CheckCircleOutlineIcon />
             </StateIcon>
             <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)' }}>
@@ -154,7 +139,7 @@ const ResetPassword = () => {
                   },
                 })
               }
-              sx={{ mt: 3, py: 1.5, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+              sx={{ mt: 3, ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
             >
               Sign in
             </Button>
@@ -170,7 +155,7 @@ const ResetPassword = () => {
         <SeoHead title="Reset link expired" canonical="/reset-password" noindex />
         <AuthPanel title="That link no longer works">
           <Box sx={{ textAlign: 'center' }}>
-            <StateIcon tint="var(--lf-warn-tint)" ink="var(--lf-warn-ink)">
+            <StateIcon tone="warn">
               <LinkOffOutlinedIcon />
             </StateIcon>
             <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)' }}>
@@ -189,7 +174,7 @@ const ResetPassword = () => {
                 color="primary"
                 disableElevation
                 fullWidth
-                sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+                sx={{ ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
               >
                 Send me a new link
               </Button>
@@ -266,7 +251,7 @@ const ResetPassword = () => {
             fullWidth
             aria-disabled={saving}
             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}
-            sx={{ mt: 2, py: 1.5, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+            sx={{ mt: 2, ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
           >
             {saving ? 'Saving…' : 'Save new password'}
           </Button>

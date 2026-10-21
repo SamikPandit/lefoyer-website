@@ -35,7 +35,12 @@ import MarkEmailReadOutlinedIcon from '@mui/icons-material/MarkEmailReadOutlined
 import SeoHead from '../components/common/SeoHead';
 import { AuthPanel } from '../components/auth/CheckYourInbox';
 import SupportLink from '../components/common/SupportLink';
-import { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../components/common/EmptyState';
+import {
+  FOCUS_RING_SX,
+  PRIMARY_ACTION_SX,
+  StateIcon,
+  TOUCH_TARGET_SX,
+} from '../components/common/EmptyState';
 import { getApiErrorMessage, requestPasswordReset } from '../services/api';
 
 /** `PasswordResetThrottle.min_interval_seconds`. */
@@ -109,23 +114,9 @@ const ForgotPassword = () => {
         <SeoHead title="Reset your password" canonical="/forgot-password" noindex />
         <AuthPanel title="Check your inbox">
           <Box sx={{ textAlign: 'center' }}>
-            <Box
-              aria-hidden="true"
-              sx={{
-                width: 64,
-                height: 64,
-                mx: 'auto',
-                mb: 2.5,
-                borderRadius: 'var(--lf-r-pill)',
-                backgroundColor: 'var(--lf-gold-tint)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                '& > svg': { fontSize: 28, color: 'var(--lf-gold-ink)' },
-              }}
-            >
+            <StateIcon tone="gold">
               <MarkEmailReadOutlinedIcon />
-            </Box>
+            </StateIcon>
 
             <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)' }}>
               {submitted.detail}
@@ -173,7 +164,7 @@ const ForgotPassword = () => {
                 color="primary"
                 disableElevation
                 fullWidth
-                sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+                sx={{ ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
               >
                 Back to sign in
               </Button>
@@ -271,7 +262,7 @@ const ForgotPassword = () => {
             fullWidth
             aria-disabled={sending}
             startIcon={sending ? <CircularProgress size={16} color="inherit" /> : null}
-            sx={{ mt: 3, py: 1.5, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+            sx={{ mt: 3, ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
           >
             {sending ? 'Sending…' : 'Email me a reset link'}
           </Button>

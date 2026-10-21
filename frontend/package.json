@@ -4,11 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "node scripts/gen-sitemap.mjs && vite build",
+    "dev": "node scripts/optimize-images.mjs --quiet && vite",
+    "prebuild": "node scripts/optimize-images.mjs --check",
+    "build": "node scripts/gen-sitemap.mjs && vite build && node scripts/optimize-images.mjs --prune-dist",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "sitemap": "node scripts/gen-sitemap.mjs"
+    "sitemap": "node scripts/gen-sitemap.mjs",
+    "images": "node scripts/optimize-images.mjs",
+    "images:check": "node scripts/optimize-images.mjs --check",
+    "images:force": "node scripts/optimize-images.mjs --force --check"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -19,9 +23,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet-async": "^2.0.5",
-    "react-router-dom": "^6.20.0",
-    "react-slick": "^0.31.0",
-    "slick-carousel": "^1.8.1"
+    "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
@@ -31,6 +33,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4",
+    "sharp": "^0.33.5",
     "vite": "^5.0.0"
   }
 }

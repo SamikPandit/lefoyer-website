@@ -52,7 +52,6 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 
 import { getCartSummary } from '../../services/api';
 import {
@@ -391,7 +390,6 @@ export const CouponField = ({
         </Stack>
         <Button
           variant="destructive"
-          size="small"
           onClick={() => {
             setCode('');
             onRemove();
@@ -418,13 +416,14 @@ export const CouponField = ({
           inputProps={{ 'aria-label': 'Coupon code', autoCapitalize: 'characters' }}
           autoComplete="off"
         />
+        {/* §2.15's reasoning, applied beyond the card: the tag glyph carried no
+            information the label does not. The spinner is the one exception,
+            because it reports a state the label cannot. */}
         <Button
           type="submit"
           variant="outlined"
           disabled={disabled || applying || !code.trim()}
-          startIcon={
-            applying ? <CircularProgress size={16} /> : <LocalOfferOutlinedIcon fontSize="small" />
-          }
+          startIcon={applying ? <CircularProgress size={16} /> : null}
           sx={{ mt: '26px', flexShrink: 0 }}
         >
           Apply
@@ -443,6 +442,10 @@ export const CouponField = ({
  * the money rows
  * ------------------------------------------------------------------ */
 
+/* §6.3: the summary row is one of <PriceBlock>'s five surfaces, and the `price`
+   variant (17px/600, `tnum`) is its register. The old row stacked a raw
+   `1.125rem` and a raw `700` on top of that variant — a second price size in a
+   system that declares exactly two (§10.20). The variant now carries both. */
 const Row = ({ label, value, tone, strong }) => (
   <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'baseline' }}>
     <Typography
@@ -458,8 +461,7 @@ const Row = ({ label, value, tone, strong }) => (
       data-tnum="true"
       sx={{
         color: tone || 'var(--lf-ink)',
-        fontWeight: strong ? 700 : 600,
-        fontSize: strong ? '1.125rem' : undefined,
+        ...(strong ? null : { fontWeight: 600 }),
         whiteSpace: 'nowrap',
       }}
     >
@@ -499,20 +501,27 @@ const CartTotals = ({
         sx={{
           p: { xs: 2, md: 3 },
           borderRadius: 'var(--lf-r-panel)',
-          backgroundColor: 'var(--lf-surface)',
+          backgroundColor: 'var(--lf-paper)',
           border: '1px solid var(--lf-hairline)',
-          boxShadow: 'var(--lf-e-edge), var(--lf-e1)',
         }}
         aria-busy="true"
       >
         <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
           {title}
         </Typography>
+        {/* P5 — the skeleton lays out at the real element's final size: three
+            money rows and one 52px primary action, which is exactly what
+            replaces it. */}
         <Stack spacing={1.5} aria-hidden="true">
           <Skeleton variant="text" width="100%" height={20} />
           <Skeleton variant="text" width="80%" height={20} />
           <Skeleton variant="text" width="60%" height={20} />
-          <Skeleton variant="rounded" width="100%" height={52} sx={{ mt: 1 }} />
+          <Skeleton
+            variant="rounded"
+            width="100%"
+            height={52}
+            sx={{ mt: 1, borderRadius: 'var(--lf-r-card)' }}
+          />
         </Stack>
         <Typography component="p" aria-live="polite" sx={{ position: 'absolute', left: -9999 }}>
           Working out your total
@@ -548,12 +557,14 @@ const CartTotals = ({
 
   return (
     <Box
+      /* §3.11 — ONE elevation ramp, and a panel is not a floating thing: only
+         the nav when scrolled, the hero card, toasts, sheets and popovers
+         carry a shadow now. The `--lf-e-edge` inset highlight is deleted. */
       sx={{
         p: { xs: 2, md: 3 },
         borderRadius: 'var(--lf-r-panel)',
-        backgroundColor: 'var(--lf-surface)',
+        backgroundColor: 'var(--lf-paper)',
         border: '1px solid var(--lf-hairline)',
-        boxShadow: 'var(--lf-e-edge), var(--lf-e1)',
         opacity: pending ? 0.72 : 1,
         transition: 'opacity var(--lf-dur-2) var(--lf-ease)',
       }}
@@ -585,7 +596,9 @@ const CartTotals = ({
 
         {nudge && (
           <Box sx={{ pt: 0.5 }}>
-            <Typography variant="caption" sx={{ color: 'var(--lf-gold-ink)', display: 'block', mb: 0.5 }}>
+            {/* §3.4 — "Free delivery" is a semantic ok, not a brand accent;
+                --lf-ok-ink measures 6.13:1 on canvas and 6.46:1 on paper. */}
+            <Typography variant="caption" sx={{ color: 'var(--lf-ok-ink)', display: 'block', mb: 0.5 }}>
               {nudge}
             </Typography>
             {progress !== null && (

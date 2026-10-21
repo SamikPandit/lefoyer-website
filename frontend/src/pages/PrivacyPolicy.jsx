@@ -23,14 +23,21 @@
  * The substantive processing text is otherwise unchanged: it is the disclosure
  * that was published, and rewriting what we claim to do with customer data is a
  * decision for the business, not a refactor.
+ *
+ * §5.9 ARCHETYPE NOTE: the table names About, Contact, Help and the 404 as EDITORIAL and
+ * the seven transactional routes as UTILITY; the three legal pages are in neither list.
+ * They are long-form prose under one `h1` at a reading measure, which is what EDITORIAL
+ * describes, so they take EDITORIAL — the `variant="h1"` title they already used, left
+ * now, on `py: var(--lf-sect-lg)` from `<PageShell>` instead of a fifth bespoke `py`
+ * pair. Reported as an ambiguity rather than decided silently.
  */
 
-import { Box, Container, Divider, Typography } from '@mui/material';
+import { Box, Divider, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
 import SeoHead from '../components/common/SeoHead';
 import SupportLink from '../components/common/SupportLink';
-import { FOCUS_RING_SX } from '../components/common/EmptyState';
+import { FOCUS_RING_SX, PageShell } from '../components/common/EmptyState';
 import { useBrand } from '../content/brand';
 
 /** Bump BY HAND when the text below changes. Never a computed date. */
@@ -73,21 +80,21 @@ const PrivacyPolicy = () => {
         canonical="/privacy-policy"
       />
 
-      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 6, md: 10 } }}>
-        <Container maxWidth="md">
-          <Box sx={{ textAlign: 'center', mb: { xs: 4, md: 6 } }}>
-            <Typography variant="h1" component="h1" sx={{ color: 'var(--lf-ink)', mb: 1.5 }}>
-              Privacy policy
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
-              Last updated: {LAST_UPDATED}
-            </Typography>
-          </Box>
+      <PageShell
+        archetype="editorial"
+        maxWidth="md"
+        title={<>Privacy policy</>}
+        intro={
+          <Typography variant="body2" component="span" sx={{ color: 'var(--lf-ink-3)' }}>
+            Last updated: {LAST_UPDATED}
+          </Typography>
+        }
+      >
 
           <Box
             sx={{
               p: { xs: 3, md: 5 },
-              backgroundColor: 'var(--lf-surface)',
+              backgroundColor: 'var(--lf-paper)',
               border: '1px solid var(--lf-hairline)',
               borderRadius: 'var(--lf-r-panel)',
             }}
@@ -316,7 +323,7 @@ const PrivacyPolicy = () => {
             </Section>
           </Box>
 
-          <Typography variant="body2" sx={{ mt: 3, textAlign: 'center', color: 'var(--lf-ink-3)' }}>
+          <Typography variant="body2" sx={{ mt: 3, color: 'var(--lf-ink-3)' }}>
             See also our{' '}
             <Box
               component={RouterLink}
@@ -335,8 +342,7 @@ const PrivacyPolicy = () => {
             </Box>
             .
           </Typography>
-        </Container>
-      </Box>
+      </PageShell>
     </>
   );
 };

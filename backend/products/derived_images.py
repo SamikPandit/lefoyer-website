@@ -126,6 +126,58 @@ def derived_for(image_field, request=None):
     }
 
 
+def derived_map_for(image_fields, request=None):
+    """Describe every derivative for a whole gallery, keyed by filename stem.
+
+    Returns ``{"base": "...", "images": {stem: {w, h, avif, webp, jpg}}}``, or None when none
+    of the fields has derivatives.
+
+    Keyed by stem rather than by frame index on purpose: the client already derives the stem
+    from the `src` it is about to render (`stemOf()` in ProductImage.jsx), so one lookup table
+    serves `image_main` and all nine gallery frames without the client having to know which
+    frame it is drawing. It is the same shape as the build-time
+    `frontend/src/generated/derivedImages.js`, so the component merges the two and keeps one
+    code path.
+
+    This is what takes the PDP's thumbnail rail from eight full-resolution masters (measured at
+    4.88 MB on /product/uv-armor-tinted-sunscreen) down to 160px AVIF thumbs of 1-7 KB each.
+    """
+    payload = _load()
+    if not payload:
+        return None
+
+    images = {}
+    for field in image_fields or ():
+        if not field or not getattr(field, 'name', None):
+            continue
+        stem = stem_for(field.name)
+        if stem in images:
+            continue
+        entry = payload['images'].get(stem)
+        if not entry:
+            continue
+        avif = [w for w in entry.get('avif') or [] if isinstance(w, int)]
+        webp = [w for w in entry.get('webp') or [] if isinstance(w, int)]
+        if not avif and not webp:
+            continue
+        images[stem] = {
+            'w': entry.get('w'),
+            'h': entry.get('h'),
+            'avif': sorted(avif),
+            'webp': sorted(webp),
+            'jpg': entry.get('jpg'),
+        }
+
+    if not images:
+        return None
+
+    base = payload.get('base') or f'{settings.MEDIA_URL.rstrip("/")}/{DERIVED_DIRNAME}/'
+    if request is not None and base.startswith('/'):
+        base = request.build_absolute_uri(base)
+
+    return {'base': base, 'images': images}
+
+
 def reset_cache():
     """Test seam: force the next read to hit disk."""
     with _lock:

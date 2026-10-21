@@ -1,23 +1,43 @@
 /**
- * CartLine — one row of the bag.
+ * ============================================================================
+ * CartLine — one row of the bag. ART_DIRECTION.md §5.4.
  *
- * Replaces the deleted `cart/CartItem.jsx`. What changed, and why:
+ * "Lines 1–7 in one panel with internal hairlines, 88px <Alcove surface='row'>
+ *  thumbnails" (§5.4). The row is a cart line, not a product card: one niche,
+ * one name, the server's money, one stepper, one Remove.
  *
- *  - **Price.** `item.price` (the LIST price) is gone. The row prints
- *    `unit_price` / `line_total` as the server computed them, so the line can
- *    never disagree with the amount charged.
- *  - **`Size: {item.size}`** is gone. There is no `size` field on `Product`;
- *    every row printed the literal "Size:" followed by nothing.
- *  - **Availability is the server's answer** (§2d): `in_stock` and
- *    `max_quantity` come down with the line. Nothing here recomputes
- *    availability from `stock_quantity`.
- *  - **A row that can no longer be sold is disabled, not silent.** The stepper
- *    and the price go quiet, the row says why, and Remove is the only live
- *    control — because the alternative is discovering it at Place Order.
- *  - **Per-row pending state.** Quantity changes are network calls; the row
- *    shows its own spinner and disables its own controls rather than freezing
- *    the whole page.
- */
+ * WHAT THE ALCOVE REVAMP CHANGED HERE
+ *  - **The raw `<img>` is gone.** It is now <Alcove surface="row">, which is
+ *    the only way a product photograph reaches a surface (§2.30, §6.1) and the
+ *    only way it gets AVIF/WebP derivatives, a `sizes` string and explicit
+ *    width/height (§7.3, A13, P5). The row used to load a 2048px master into
+ *    an 88px box.
+ *  - **`filter: grayscale(1)` on an unavailable line is DELETED** (§10.13,
+ *    §2.11): the light goes out, the niche does not, and the photograph is
+ *    never touched. The row's `opacity: 0.72` is deleted for the same reason —
+ *    it dimmed the photograph, the price and the Remove button together. The
+ *    niche goes unlit via `data-stock`, and the unavailability is carried by
+ *    WORDS (§6.4's label plus the server's own reason), never by colour or
+ *    dimming alone (A8).
+ *  - **The stock line is <StockLabel variant="inline">** — §6.4's single
+ *    derivation, so a cart line can no longer disagree with the tile or the
+ *    PDP about the same product.
+ *  - **The stepper's buttons are 44px**, not MUI's 36px small (A6).
+ *
+ * WHAT DID NOT CHANGE, DELIBERATELY
+ *  - **Money.** `unit_price` / `line_total` are the server's own figures,
+ *    printed verbatim. `<PriceBlock>` derives a price from a PRODUCT, which is
+ *    exactly the defect this file was written to kill (the list price on the
+ *    card, the charged price in the basket), so the line total still goes
+ *    through `formatMoney`. It uses the `price` typography variant, which is
+ *    the same register and the same `tnum` <PriceBlock> renders.
+ *  - **Availability is the server's answer** (IMPL_SPEC §2d): `in_stock` and
+ *    `max_quantity` come down with the line and nothing here recomputes them
+ *    from `stock_quantity`. The line's answer is fed INTO §6.4's derivation so
+ *    the wording is shared, not duplicated.
+ *  - Per-row pending state, the ceiling mirror and the server's verbatim
+ *    refusal message.
+ * ========================================================================== */
 
 import { useState } from 'react';
 import Box from '@mui/material/Box';
@@ -27,10 +47,12 @@ import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import RemoveIcon from '@mui/icons-material/Remove';
 import { Link as RouterLink } from 'react-router-dom';
 
+import Alcove from '../common/Alcove';
+import StockLabel from '../product/StockLabel';
+import { stockState } from '../../utils/stock';
 import { formatMoney } from './CartTotals';
 
 /**
@@ -47,6 +69,14 @@ const REASON_COPY = {
   UNAVAILABLE: 'No longer available',
   NOT_FOUND: 'No longer available',
 };
+
+/**
+ * §3.10 — the `row` surface caps the niche at 88px of HEIGHT, and `.lf-alcove`
+ * divides that by the LOCKED ratio to get its inline size. Naming the width
+ * here keeps the flex item from depending on a percentage that resolves
+ * against itself; the ratio is still read from the token, never retyped.
+ */
+const ROW_NICHE_W = 'calc(88px / var(--lf-arch-ratio))';
 
 /**
  * @param {object} props
@@ -76,11 +106,20 @@ const CartLine = ({
     MAX_LINE_QUANTITY,
     line.maxQuantity && line.maxQuantity > 0 ? line.maxQuantity : MAX_LINE_QUANTITY
   );
+
+  /* ONE derivation (§6.4), given the authority IMPL_SPEC §2d names: the
+     summary's per-line `in_stock`. Passing it in means the cart line borrows
+     the wording and the dot colour instead of inventing a second vocabulary —
+     which is how a tile and a basket ended up disagreeing before. */
+  const stock = stockState({ ...product, in_stock: inStock });
+
   const unavailableNote = !inStock
     ? REASON_COPY[reason] || REASON_COPY.UNAVAILABLE
     : reason === 'INSUFFICIENT_STOCK'
       ? `Only ${available ?? ceiling} left — reduce the quantity`
       : null;
+
+  const productHref = product.slug ? `/product/${product.slug}` : '/products';
 
   const run = async (action) => {
     setBusy(true);
@@ -117,32 +156,21 @@ const CartLine = ({
         gap: { xs: 1.5, sm: 2 },
         py: 2.5,
         borderBottom: last ? 'none' : '1px solid var(--lf-hairline)',
-        opacity: inStock ? 1 : 0.72,
         position: 'relative',
       }}
       aria-busy={working || undefined}
     >
+      {/* The niche. `stock` lights or unlights the WALL (§2.11); the
+          photograph renders at full strength in every state. The name beside
+          it is the row's accessible link, so the image itself takes `alt=""`
+          rather than naming the product a second time (§7.3). */}
       <Box
         component={RouterLink}
-        to={product.slug ? `/product/${product.slug}` : '/products'}
-        sx={{ flexShrink: 0, display: 'block', borderRadius: 'var(--lf-r-field)' }}
+        to={productHref}
         aria-label={product.name}
+        sx={{ flex: 'none', display: 'block', width: ROW_NICHE_W }}
       >
-        <Box
-          component="img"
-          src={product.image_main || ''}
-          alt={product.name || ''}
-          data-product="true"
-          loading="lazy"
-          sx={{
-            width: { xs: 72, sm: 88 },
-            height: { xs: 72, sm: 88 },
-            objectFit: 'cover',
-            borderRadius: 'var(--lf-r-field)',
-            backgroundColor: 'var(--lf-surface-sunken)',
-            filter: inStock ? 'none' : 'grayscale(1)',
-          }}
-        />
+        <Alcove product={product} surface="row" stock={stock.state} alt="" />
       </Box>
 
       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -153,20 +181,21 @@ const CartLine = ({
           alignItems={{ xs: 'flex-start', sm: 'baseline' }}
         >
           <Typography
-            variant="subtitle1"
+            variant="h5"
             component={RouterLink}
-            to={product.slug ? `/product/${product.slug}` : '/products'}
+            to={productHref}
             sx={{
-              fontWeight: 600,
               color: 'var(--lf-ink)',
               textDecoration: 'none',
-              '&:hover': { textDecoration: 'underline' },
+              '@media (hover:hover)': { '&:hover': { textDecoration: 'underline' } },
             }}
           >
             {product.name}
           </Typography>
+          {/* The server's line total, in <PriceBlock>'s own register. */}
           <Typography
             variant="price"
+            component="p"
             data-tnum="true"
             sx={{ color: 'var(--lf-ink)', whiteSpace: 'nowrap' }}
           >
@@ -176,13 +205,17 @@ const CartLine = ({
 
         <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)', display: 'block', mt: 0.25 }}>
           {formatMoney(unitPrice)} each
+          {product.size ? ` · ${product.size}` : ''}
           {product.sku ? ` · ${product.sku}` : ''}
         </Typography>
+
+        {/* §6.4 — rendered ALWAYS, including in stock: words and a dot. */}
+        <StockLabel stock={stock} variant="inline" sx={{ mt: 0.5 }} />
 
         {unavailableNote && (
           <Typography
             variant="caption"
-            sx={{ color: 'var(--lf-warn-ink)', display: 'block', mt: 0.5, fontWeight: 600 }}
+            sx={{ color: 'var(--lf-warn-ink)', display: 'block', mt: 0.25, fontWeight: 600 }}
           >
             {unavailableNote}
           </Typography>
@@ -210,22 +243,23 @@ const CartLine = ({
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                border: '1px solid var(--lf-border-strong)',
+                border: '1px solid var(--lf-border-field)',
                 borderRadius: 'var(--lf-r-field)',
-                backgroundColor: 'var(--lf-surface)',
+                backgroundColor: 'var(--lf-paper)',
               }}
             >
+              {/* A6: a 44px floor on every target, including these two. */}
               <IconButton
-                size="small"
                 onClick={() => step(-1)}
                 disabled={working}
+                sx={{ width: 44, height: 44 }}
                 aria-label={quantity === 1 ? `Remove ${product.name}` : `Decrease quantity of ${product.name}`}
               >
                 <RemoveIcon fontSize="small" />
               </IconButton>
               <Box sx={{ minWidth: 40, textAlign: 'center', position: 'relative' }}>
                 {working ? (
-                  <CircularProgress size={16} aria-label="Updating" />
+                  <CircularProgress size={16} thickness={3.6} aria-label="Updating" />
                 ) : (
                   <Typography component="span" data-tnum="true" sx={{ fontWeight: 600 }}>
                     {quantity}
@@ -233,24 +267,23 @@ const CartLine = ({
                 )}
               </Box>
               <IconButton
-                size="small"
                 onClick={() => step(1)}
                 disabled={working || quantity >= ceiling}
+                sx={{ width: 44, height: 44 }}
                 aria-label={`Increase quantity of ${product.name}`}
               >
                 <AddIcon fontSize="small" />
               </IconButton>
             </Box>
           ) : (
-            <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
+            <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }} data-tnum="true">
               Quantity {quantity}
             </Typography>
           )}
 
           <Button
             variant="destructive"
-            size="small"
-            startIcon={working ? <CircularProgress size={16} /> : <DeleteOutlineIcon fontSize="small" />}
+            startIcon={working ? <CircularProgress size={16} thickness={3.6} /> : null}
             onClick={() => run(() => onRemove(product.id))}
             disabled={working}
           >

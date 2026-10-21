@@ -20,6 +20,15 @@
  *  - On open it re-reads `payment-status/`, so an order that was paid in another
  *    tab (or confirmed by the gateway callback in the meantime) cannot be
  *    offered a second payment.
+ *
+ * ALCOVE (ART_DIRECTION.md §3.7, §6.3, §10.20) — PRESENTATION ONLY. Not one
+ * line of the retry call, the stock re-validation or the COD switch warning is
+ * changed. The amount is set in the `price` variant, which is the register
+ * <PriceBlock> uses for every money row on the site and carries `tnum`, so the
+ * figure in this dialog matches the figure in the summary panel character for
+ * character; the two decorative payment-method glyphs are deleted (§2.15's
+ * reasoning — they carry nothing the labels do not); and the fieldset's
+ * <legend> keeps its place while its raw rem is replaced by `subtitle2`.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -39,9 +48,6 @@ import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
-import PaymentOutlinedIcon from '@mui/icons-material/PaymentOutlined';
-
 import SupportLink from '../common/SupportLink';
 import { formatMoney } from '../cart/CartTotals';
 import { orderRef } from './OrderCard';
@@ -138,7 +144,7 @@ const PaymentCompletionDialog = ({ open, onClose, order, onSuccess }) => {
     <Dialog open={Boolean(open)} onClose={working ? undefined : onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Complete payment</DialogTitle>
       <DialogContent>
-        <Typography variant="body1" data-tnum="true" sx={{ mb: 0.5 }}>
+        <Typography variant="price" component="p" data-tnum="true" sx={{ mb: 0.5 }}>
           Order {orderRef(order)} · {formatMoney(total)}
         </Typography>
         <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
@@ -147,7 +153,7 @@ const PaymentCompletionDialog = ({ open, onClose, order, onSuccess }) => {
 
         {checking && (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2 }}>
-            <CircularProgress size={16} />
+            <CircularProgress size={16} thickness={3.6} />
             <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
               Checking the current state of this order…
             </Typography>
@@ -189,11 +195,10 @@ const PaymentCompletionDialog = ({ open, onClose, order, onSuccess }) => {
 
         {!blocked && (
           <FormControl component="fieldset" sx={{ mt: 2.5, width: '100%' }}>
-            <FormLabel
-              component="legend"
-              sx={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--lf-ink)', mb: 1 }}
-            >
-              How would you like to pay?
+            <FormLabel component="legend" sx={{ mb: 1 }}>
+              <Typography variant="subtitle2" component="span" sx={{ color: 'var(--lf-ink)' }}>
+                How would you like to pay?
+              </Typography>
             </FormLabel>
             <RadioGroup
               value={paymentMethod}
@@ -203,34 +208,28 @@ const PaymentCompletionDialog = ({ open, onClose, order, onSuccess }) => {
                 value="PREPAID"
                 control={<Radio />}
                 label={
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <PaymentOutlinedIcon fontSize="small" />
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        Pay now — UPI, card or net banking
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
-                        Opens PhonePe, then brings you back to this order.
-                      </Typography>
-                    </Box>
-                  </Stack>
+                  <Box>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      Pay now — UPI, card or net banking
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
+                      Opens PhonePe, then brings you back to this order.
+                    </Typography>
+                  </Box>
                 }
               />
               <FormControlLabel
                 value="COD"
                 control={<Radio />}
                 label={
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <AccountBalanceWalletOutlinedIcon fontSize="small" />
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        Switch to cash on delivery
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
-                        Pay the courier when the order arrives.
-                      </Typography>
-                    </Box>
-                  </Stack>
+                  <Box>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      Switch to cash on delivery
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
+                      Pay the courier when the order arrives.
+                    </Typography>
+                  </Box>
                 }
               />
             </RadioGroup>
@@ -254,7 +253,7 @@ const PaymentCompletionDialog = ({ open, onClose, order, onSuccess }) => {
         <Button
           onClick={submit}
           disabled={working || checking || Boolean(blocked) || shortfalls.length > 0}
-          startIcon={working ? <CircularProgress size={18} /> : null}
+          startIcon={working ? <CircularProgress size={18} thickness={3.6} /> : null}
         >
           {working
             ? 'Working…'

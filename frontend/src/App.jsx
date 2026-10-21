@@ -111,7 +111,7 @@ class ErrorBoundary extends React.Component {
                   width: '100%',
                   overflowX: 'auto',
                   whiteSpace: 'pre-wrap',
-                  backgroundColor: 'var(--lf-surface-sunken)',
+                  backgroundColor: 'var(--lf-mat)',
                   borderRadius: 'var(--lf-r-field)',
                   color: 'var(--lf-err-ink)',
                 }}

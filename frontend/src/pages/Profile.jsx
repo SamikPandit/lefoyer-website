@@ -16,6 +16,18 @@
  *    the envelope once, in api.js (§2a).
  *  - Cormorant Garamond overrides deleted (the font is no longer loaded at all);
  *    `<Grid item>` migrated to v7 `size`.
+ *
+ * ART_DIRECTION §5.8 / §5.9, applied here:
+ *  - **UTILITY archetype.** `h3 component="h1"`, left, `py: var(--lf-sect)` — via
+ *    `<PageShell>`, so "My account" can no longer be a different size from "My orders"
+ *    and "Saved items", three pages reached from the same menu (§2.34).
+ *  - **The empty state finally gets its `children`** (§2.28): the three in-stock
+ *    products, rather than a 64px beige circle and a full stop.
+ *  - `boxShadow: 'var(--lf-e-edge), var(--lf-e1)'` on the details panel is gone. §3.11
+ *    makes `elevation` the single way to ask for depth and gives panels **none**; the
+ *    1px ring it was painting is also exactly the card frame §2.6 deletes.
+ *  - The resend control uses `aria-disabled` with the guard in the handler, never the
+ *    `disabled` attribute (A4), and states its reason adjacent.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -25,7 +37,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
-import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
 import Skeleton from '@mui/material/Skeleton';
@@ -37,7 +48,15 @@ import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 import SeoHead from '../components/common/SeoHead';
-import EmptyState from '../components/common/EmptyState';
+import EmptyState, {
+  FOCUS_RING_SX,
+  PageShell,
+  TOUCH_TARGET_SX,
+  useProductShelf,
+} from '../components/common/EmptyState';
+import ProductCard from '../components/product/ProductCard';
+import ProductCardSkeleton from '../components/common/ProductCardSkeleton';
+import { PRODUCT_RAIL_SX } from '../components/product/productGrid';
 import ErrorState from '../components/common/ErrorState';
 import SupportLink from '../components/common/SupportLink';
 import OrderCard from '../components/order/OrderCard';
@@ -46,6 +65,8 @@ import { getApiErrorMessage, listOrders, resendVerification } from '../services/
 import { useBrand } from '../content/brand';
 
 const RECENT_COUNT = 3;
+/** §5.8's table: the Profile empty state's rail is the three in-stock products. */
+const RAIL_SIZE = 3;
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -58,6 +79,16 @@ const Profile = () => {
   const [error, setError] = useState(null);
   const [resending, setResending] = useState(false);
   const [resendNotice, setResendNotice] = useState(null);
+
+  /* §5.8's table: the Profile empty state shows the three in-stock products.
+     Gated on the state that renders it, so the common path — an account WITH
+     orders — costs no extra request. */
+  const showEmptyOrders = !loading && !error && orders.length === 0;
+  const { products: rail, loading: railLoading } = useProductShelf({
+    inStockOnly: true,
+    limit: RAIL_SIZE,
+    enabled: showEmptyOrders,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,7 +116,9 @@ const Profile = () => {
   };
 
   const handleResend = async () => {
-    if (!user?.email) return;
+    // A4: `aria-disabled` keeps the control focusable, so the double-submit guard
+    // lives here rather than on the element.
+    if (resending || !user?.email) return;
     setResending(true);
     setResendNotice(null);
     try {
@@ -112,7 +145,7 @@ const Profile = () => {
     // ProtectedRoute has already settled `loading`, so this is the rare case of
     // a token without a readable account. Say so rather than rendering nothing.
     return (
-      <Container maxWidth="sm" sx={{ py: 8 }}>
+      <PageShell archetype="utility" maxWidth="sm">
         <SeoHead title="My account" noindex />
         <ErrorState
           variant="page"
@@ -123,29 +156,24 @@ const Profile = () => {
           secondaryLabel="Sign in"
           secondaryTo="/login"
         />
-      </Container>
+      </PageShell>
     );
   }
 
   const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ');
 
   return (
-    <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 4, md: 7 } }}>
+    <PageShell archetype="utility" maxWidth="lg" title="My account">
       <SeoHead title="My account" noindex description="Your account and recent orders." />
-      <Container maxWidth="lg">
-        <Typography variant="h3" component="h1" sx={{ mb: 3 }}>
-          My account
-        </Typography>
 
-        <Grid container spacing={{ xs: 3, md: 4 }}>
+      <Grid container spacing={{ xs: 3, md: 4 }}>
           <Grid size={{ xs: 12, md: 4 }}>
             <Box
               sx={{
                 p: { xs: 2, md: 3 },
                 borderRadius: 'var(--lf-r-panel)',
                 border: '1px solid var(--lf-hairline)',
-                backgroundColor: 'var(--lf-surface)',
-                boxShadow: 'var(--lf-e-edge), var(--lf-e1)',
+                backgroundColor: 'var(--lf-paper)',
                 position: { md: 'sticky' },
                 top: { md: 'calc(var(--lf-nav-h) + 24px)' },
               }}
@@ -156,7 +184,7 @@ const Profile = () => {
 
               {displayName && (
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="overline" sx={{ color: 'var(--lf-ink-3)' }}>
+                  <Typography variant="eyebrow" component="p" sx={{ color: 'var(--lf-ink-3)' }}>
                     Name
                   </Typography>
                   <Typography variant="body1">{displayName}</Typography>
@@ -164,7 +192,7 @@ const Profile = () => {
               )}
 
               <Box sx={{ mb: 2 }}>
-                <Typography variant="overline" sx={{ color: 'var(--lf-ink-3)' }}>
+                <Typography variant="eyebrow" component="p" sx={{ color: 'var(--lf-ink-3)' }}>
                   Email
                 </Typography>
                 <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>
@@ -195,7 +223,7 @@ const Profile = () => {
 
               {user.phone_number && (
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="overline" sx={{ color: 'var(--lf-ink-3)' }}>
+                  <Typography variant="eyebrow" component="p" sx={{ color: 'var(--lf-ink-3)' }}>
                     Mobile
                   </Typography>
                   <Typography variant="body1" data-tnum="true">
@@ -214,8 +242,12 @@ const Profile = () => {
                   <Button
                     size="small"
                     onClick={handleResend}
-                    disabled={resending}
-                    startIcon={resending ? <CircularProgress size={16} /> : null}
+                    aria-disabled={resending}
+                    aria-busy={resending ? 'true' : undefined}
+                    startIcon={
+                      resending ? <CircularProgress size={16} thickness={3.6} color="inherit" /> : null
+                    }
+                    sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
                   >
                     {resending ? 'Sending…' : 'Send a new link'}
                   </Button>
@@ -244,8 +276,10 @@ const Profile = () => {
                   My wishlist
                 </Button>
                 <SupportLink variant="button" topic="account" />
+                {/* §5.8: one label per route. The nav item, the footer link and this
+                    button all say Help; the route is still /faq. */}
                 <Button variant="text" component={RouterLink} to={brand.support.faqPath}>
-                  Read the FAQ
+                  Help
                 </Button>
                 <Button variant="destructive" onClick={handleLogout} fullWidth>
                   Sign out
@@ -285,7 +319,7 @@ const Profile = () => {
                       p: 3,
                       borderRadius: 'var(--lf-r-card)',
                       border: '1px solid var(--lf-hairline)',
-                      backgroundColor: 'var(--lf-surface)',
+                      backgroundColor: 'var(--lf-paper)',
                     }}
                   >
                     <Skeleton variant="text" width="40%" height={26} />
@@ -305,23 +339,49 @@ const Profile = () => {
               />
             )}
 
-            {!loading && !error && orders.length === 0 && (
+            {showEmptyOrders && (
               <EmptyState
-                icon={<ReceiptLongOutlinedIcon sx={{ fontSize: 28 }} />}
+                icon={<ReceiptLongOutlinedIcon />}
                 title="No orders yet"
                 message="When you place an order it will show up here."
                 primaryLabel="Shop all skincare"
                 primaryTo="/products"
-              />
+                headingComponent="h3"
+              >
+                {railLoading || rail.length > 0 ? (
+                  <Box component="section" aria-labelledby="profile-rail-heading">
+                    <Typography
+                      id="profile-rail-heading"
+                      variant="h5"
+                      component="h4"
+                      sx={{ color: 'var(--lf-ink)', mb: 2 }}
+                    >
+                      In stock right now
+                    </Typography>
+                    {/* The RAIL, not the catalogue grid: this sits in the md:8
+                        column, where §4.1's viewport-keyed 3-up would produce
+                        ~225px cards — under the 288px floor the card's own
+                        arithmetic depends on (§4.3). 300px tracks hold. */}
+                    <Box className="lf-rail" sx={PRODUCT_RAIL_SX}>
+                      {railLoading && rail.length === 0 ? (
+                        <ProductCardSkeleton count={RAIL_SIZE} label="Loading products" />
+                      ) : (
+                        rail.map((product) => (
+                          <ProductCard key={product.id ?? product.slug} product={product} />
+                        ))
+                      )}
+                    </Box>
+                  </Box>
+                ) : null}
+              </EmptyState>
             )}
 
             {orders.map((order) => (
               <OrderCard key={order.id} order={order} />
             ))}
           </Grid>
-        </Grid>
-      </Container>
-    </Box>
+      </Grid>
+    </PageShell>
   );
 };
 

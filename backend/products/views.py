@@ -52,6 +52,7 @@ from .models import (
     is_sellable_annotation,
     public_sellable_q,
     sellable_q,
+    visible_q,
 )
 from .serializers import (
     CategorySerializer,
@@ -370,7 +371,22 @@ class TaxonomyViewSet(CatalogueThrottleMixin, viewsets.ReadOnlyModelViewSet):
                 relation,
                 filter=public_sellable_q(relation),
                 distinct=True,
-            )
+            ),
+            # `listed_count` is what SELECTING this facet actually returns: every visible
+            # product, whatever its stock state. The two differ because LF-02 keeps
+            # out-of-stock products listed (with a Notify me), while LF-24 gates a navigation
+            # tile on there being something buyable behind it.
+            #
+            # Both numbers are needed, and conflating them is a bug we shipped: the PLP chip
+            # printed `product_count` and then ran an unconstrained filter, so the chip
+            # labelled "Cleansers (1)" returned four products and the page's own aria-live
+            # region announced "4 products" — a number the next click disproved. The chip now
+            # prints `listed_count`; `product_count` keeps its LF-24 meaning untouched.
+            listed_count=Count(
+                relation,
+                filter=visible_q(relation),
+                distinct=True,
+            ),
         ).order_by('display_order', 'name')
 
 

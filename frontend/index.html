@@ -6,7 +6,7 @@
     <!-- viewport-fit=cover is REQUIRED: without it every env(safe-area-inset-*)
          in the "Counter" design system resolves to 0 on notched devices. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#FDFBF9" />
+    <meta name="theme-color" content="#F6EFE4" />
     <meta name="color-scheme" content="only light" />
 
     <!-- ========================================================================
@@ -60,15 +60,41 @@
     />
 
     <!-- Meta Pixel Code — the ONE init on the site. App.jsx must not re-init it;
-         all events go through src/services/analytics.js. -->
+         all events go through src/services/analytics.js.
+
+         DEFERRED, deliberately. The standard snippet injects fbevents.js from
+         <head> synchronously; measured on this site that is 241 KB over three
+         requests (fbevents.js 114,709 B plus signals/config), which is slightly
+         MORE than the entire compressed first-party payload, fetched before the
+         first product pixel is painted. On the audience this store actually has —
+         mid and low-end Android over Indian 4G — that is the largest non-image
+         cost on the critical path.
+
+         The `fbq` shim below is defined IMMEDIATELY and queues calls, so
+         analytics.js can fire events from the first render exactly as before and
+         nothing is lost; only the network fetch waits for idle (or 3.5 s, or the
+         first interaction, whichever comes first). The queue replays on load.
+         `track('PageView')` is still called here, so it is queued at the same
+         moment it used to be and is reported with the same page context. -->
     <script>
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      !function(f,b,e,v,n,t,s){
+        if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];
+        var loaded=false;
+        function load(){
+          if(loaded)return;loaded=true;
+          t=b.createElement(e);t.async=!0;t.src=v;
+          s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s);
+        }
+        /* Whichever comes first: the browser going idle, a real interaction, or a
+           hard 3.5 s cap so a busy main thread can never drop the pageview. */
+        if('requestIdleCallback' in f){f.requestIdleCallback(load,{timeout:3500});}
+        else{f.setTimeout(load,2000);}
+        ['pointerdown','keydown','touchstart'].forEach(function(evt){
+          b.addEventListener(evt,load,{once:true,passive:true});
+        });
+      }(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '4302094446724267');
       fbq('track', 'PageView');

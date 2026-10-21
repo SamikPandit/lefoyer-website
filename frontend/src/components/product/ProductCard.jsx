@@ -1,139 +1,129 @@
 /**
- * ProductCard — the tile that carries every listing, rail and search result.
+ * ============================================================================
+ * <ProductCard> — ART_DIRECTION.md §6.2. BORDERLESS. ONE CARD. EVERYWHERE.
  *
- * WHAT WAS WRONG WITH THE OLD CARD (all verified in the file this replaces)
- *  1. **Quick Add and the wishlist heart were hover-only** (`opacity: isHovered ? 1 : 0`,
- *     `translateY(100%)`). On a phone — which is most of this store's traffic — neither
- *     existed. DESIGN_SYSTEM §9 #5: "Do not hide anything behind `:hover`." Both are now
- *     permanently visible at every breakpoint; hover is reduced to a *decorative*
- *     second-image crossfade on pointer devices, and that second image is not even
- *     requested on a touch device (§7).
- *  2. **The heart's `onClick` was an empty placeholder** with the comment "Wishlist logic
- *     here - missing in original component". It is now wired to `useWishlist()`, which is
- *     optimistic, and a guest is sent to sign-in **carrying the page they came from** so
- *     LF-13's return journey works.
- *  3. **Every control was nested inside the `<Link>`** that wrapped the whole card, so a
- *     tap could be swallowed by navigation, and the markup was invalid
- *     (interactive-in-interactive). The actions now sit OUTSIDE the anchor; the title's
- *     anchor carries `::after { inset: 0 }`, which makes the whole card clickable with no
- *     nesting at all (§7).
- *  4. **The out-of-stock overlay sat at `zIndex: 3` above the heart**, with a code comment
- *     admitting "overlay covers it". The scrim is now `pointer-events: none` at z-index 1
- *     and the heart is at 3, so it stays usable on an unbuyable product — which is
- *     exactly when saving for later matters most.
- *  5. **A hidden Quick Add was the entire out-of-stock experience.** §2d: "Unsellable
- *     means an action, not a dead end" — the CTA is replaced by "Notify me when it's
- *     back" (`NotifyMeButton`), never a dead grey button (§6.8 #3).
- *  6. **`rating = 0` rendered an empty five-star row with `(0)`** on a catalogue where
- *     every row is `0.00` and the `Review` table is empty. §2e: stars come from
- *     `review_summary` only, and at `count === 0` the widget is not rendered at all —
- *     "Be the first to review" takes its place.
- *  7. **Availability was `in_stock === undefined ? … : stock_quantity > 0`.**
- *     `stock_quantity` is not served any more, so that fallback read `undefined`.
- *     §2d: `in_stock` and `available_quantity`, via `stockState()`.
- *  8. `category?.name || 'Skincare'` silently labelled every uncategorised product
- *     "Skincare"; `₹{price}` printed the list price while the backend charges
- *     `discount_price`; and the title hard-coded a display serif, a font this app
- *     no longer loads.
+ * Home's shelf, the PLP, the wishlist, the PDP's rest-of-the-shelf rail and
+ * the search results all render THIS component at THIS grid (§4). One card
+ * language, one grid token, site-wide (§10.23).
  *
- * The one prop is `product`. `Search.jsx`, `FeaturedProducts.jsx`, `Wishlist.jsx`,
- * `RelatedProducts.jsx` and `ProductListing.jsx` all call it that way.
- */
+ * THE CARD'S FRAME IS DELETED (§2.6). The previous build diagnosed the card
+ * honestly — "one notch from a generic SaaS card" — and then prescribed MORE
+ * chrome: a 1px border, a `--lf-e1` hairline ring and a `--lf-e-edge` inset
+ * highlight. Decoration cannot fix a structural miscast. **THE NICHE IS THE
+ * FRAME.** No `Card`, no border, no `CardContent` padding, no shadow — which
+ * is also what returns the full card width to the CTA, half the fix for the
+ * two-line button wrap.
+ *
+ * `display: grid` with `grid-template-rows: auto auto auto auto 1fr auto`, so
+ * **the CTA bottom-aligns across every card in a row whether or not a name
+ * wrapped**. That replaces the `minHeight: 45` hack on the title. The flexible
+ * row is the meta block and its content is bottom-aligned, so the price,
+ * the size line and the button all line up across a row while the slack
+ * collects under the name — "prices and buttons align across a row without a
+ * magic number" (§4.3).
+ *
+ * FIXED ORDER, EVERY ELEMENT AT FULL CARD WIDTH (§6.2):
+ *   1. <Alcove surface="card"> + the wishlist heart at its bottom-RIGHT
+ *   2. 14px → <StockLabel variant="ledge"> — the full-width status row
+ *   3.  6px → category eyebrow, 12px --lf-gold-ink
+ *   4.  2px → h4 19px product name, 2-line clamp as a SAFETY NET only
+ *   5.  4px → "Be the first to review", a real link to the PDP review form
+ *   6.  2px → size line
+ *   7. 10px → <PriceBlock>
+ *   8. 14px → the CTA, 48px, full card width, NO startIcon
+ *
+ * THE ARITHMETIC, RE-DERIVED AT THE 288px FLOOR (§4.3's method, §4.3's
+ * coefficients: Inter 600 at 19px, ~0.68em per capital, 0.54em per lowercase,
+ * 0.26em per space):
+ *
+ *   "Glow Game WaterLess Face Wash"    6 caps, 19 lower, 4 spaces → **292px**
+ *   "The Daily Invisible Moisturizer"  4 caps, 24 lower, 3 spaces → **313px**
+ *   "UV Armor Tinted Sunscreen"        5 caps, 17 lower, 3 spaces → **254px**
+ *   "Raindrops Shower Gel"             3 caps, 15 lower, 2 spaces → **203px**
+ *   "WhiteWave Face Wash"              4 caps, 13 lower, 2 spaces → **195px**
+ *   "Spotless Face Wash"               3 caps, 13 lower, 2 spaces → **182px**
+ *
+ *   §4.3 prints 287px for the moisturizer; by its own coefficients the figure
+ *   is 313px (the discrepancy is reported, not papered over). The consequence
+ *   is one wrapped line, not a truncation: the longest name needs 313px, so it
+ *   sets on ONE line at 362px (1200) and 384px (1440) and wraps to TWO at 288,
+ *   304 and 348 — inside the 2-line clamp either way. A THIRD line would need
+ *   a card narrower than 157px, which this grid cannot produce at any viewport
+ *   from 320 to 1440. **The clamp therefore never truncates a name anywhere
+ *   the site renders**, and the grid rows keep the CTAs aligned when it wraps.
+ *   Today at 161px the line box is 137px, holding ~15 characters, so the word
+ *   being cut is the word that says what the thing IS.
+ *
+ *   CTA label box at 288px = 288 − 2×20 of MUI padding = 248px. `Add to bag`
+ *   ~75px, `Notify me` ~68px, both `nowrap` with the `startIcon` deleted
+ *   (§2.15) — 2.3× the room, against ~59px of label box today.
+ *
+ * NO MEANING IS CARRIED BY COLOUR ALONE (A8), NOTHING HIDES BEHIND :hover
+ * (§10.14), AND THERE ARE NO NESTED INTERACTIVE ELEMENTS (A12): the name's
+ * anchor carries `::after { inset: 0 }`, so the whole card is clickable
+ * without wrapping the buttons in it. The niche paints above that overlay with
+ * `pointer-events: none`, so a press on the photograph still navigates while
+ * the wishlist heart inside it stays pressable.
+ *
+ * NEVER A STAR ROW AND NEVER A COUNT (§6.2 item 5, §10.9). All six products
+ * have zero `Review` rows; production once shipped hand-typed 4.50/40-reviews
+ * with no review rows, and inventing social proof is the worst thing available
+ * here.
+ * ========================================================================== */
 
 import { useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
-import Rating from '@mui/material/Rating';
 import Typography from '@mui/material/Typography';
-import CheckIcon from '@mui/icons-material/Check';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
-import useMediaQuery from '@mui/material/useMediaQuery';
 
+import Alcove from '../common/Alcove';
 import { useAuth } from '../../context/AuthContext';
-import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
-import { NotifyMeButton } from '../common/NotifyMeDialog';
-import { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../common/EmptyState';
-import {
-  priceView,
-  productAlt,
-  productPath,
-  reviewView,
-  stockState,
-} from './productPresentation';
-
-/** §6.8: a success flash that is shorter than this reads as a glitch. */
-const ADDED_FLASH_MS = 900;
-/** §6.8: "400 ms minimum display" for the loading state, so it cannot flicker. */
-const MIN_SPINNER_MS = 400;
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Shared placement for the one status badge on the mat. */
-const BADGE_SX = {
-  position: 'absolute',
-  top: 8,
-  left: 8,
-  zIndex: 2,
-  pointerEvents: 'none',
-};
+import { stockState } from '../../utils/stock';
+import AddToBag from './AddToBag';
+import NotifyMe from './NotifyMe';
+import PriceBlock, { hasPrice } from './PriceBlock';
+import StockLabel from './StockLabel';
+import { productPath, reviewView } from './productPresentation';
 
 /**
- * The stock row. Rendered ALWAYS, including when in stock (DESIGN_SYSTEM §7), with its
- * own words plus a dot — never colour alone.
+ * @param {object} props
+ * @param {object} props.product  The API payload. No product name, price, size
+ *   or stock state is ever typed into this component (§10.21).
+ * @param {object} [props.sx]     For the surfaces that set their own track
+ *   width — the PDP's 300px scroll-snap rail (§5.3).
+ * @param {string} [props.className]
+ * @returns {JSX.Element|null}
  */
-const StockPill = ({ stock }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minHeight: 20 }}>
-    <Box
-      aria-hidden="true"
-      sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: stock.dotColor, flexShrink: 0 }}
-    />
-    <Typography variant="caption" sx={{ color: stock.textColor }}>
-      {stock.label}
-    </Typography>
-  </Box>
-);
-
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, sx, className, ...rest }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
-  const { addToCart, pendingItemIds } = useCart();
   const { isInWishlist, toggleWishlist, pendingProductIds } = useWishlist();
 
-  // Hover is a pointer-device *enhancement* only: it crossfades to a second shot.
-  // Nothing is revealed by it, and on a touch device the second image is never fetched.
-  const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
-  const [hovered, setHovered] = useState(false);
-
-  const [adding, setAdding] = useState(false);
-  const [added, setAdded] = useState(false);
-  const [actionError, setActionError] = useState(null);
+  const [message, setMessage] = useState(null);
   const aliveRef = useRef(true);
-  const flashTimer = useRef(null);
 
   useEffect(() => {
     aliveRef.current = true;
     return () => {
       aliveRef.current = false;
-      if (flashTimer.current) clearTimeout(flashTimer.current);
     };
   }, []);
 
   if (!product) return null;
 
   const stock = stockState(product);
-  const price = priceView(product, { sellable: stock.sellable });
   const reviews = reviewView(product);
   const path = productPath(product);
+  const priced = hasPrice(product);
+
+  /* No silent `|| 'Skincare'`: an uncategorised product gets no eyebrow, not
+     a label that is simply untrue. */
   const categoryName =
     typeof product.category?.name === 'string' && product.category.name.trim()
       ? product.category.name.trim()
@@ -141,357 +131,229 @@ const ProductCard = ({ product }) => {
 
   const saved = isInWishlist(product);
   const wishlistPending = (pendingProductIds || []).includes(product.id);
-  const cartPending = adding || (pendingItemIds || []).includes(product.id);
 
-  const handleAddToCart = async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (cartPending || !stock.sellable || !price.hasPrice) return;
-
-    setActionError(null);
-    setAdding(true);
-    const startedAt = Date.now();
-    const result = await addToCart(product, 1);
-    const elapsed = Date.now() - startedAt;
-    if (elapsed < MIN_SPINNER_MS) await sleep(MIN_SPINNER_MS - elapsed);
-    if (!aliveRef.current) return;
-
-    setAdding(false);
-    if (result === true) {
-      setAdded(true);
-      flashTimer.current = setTimeout(() => {
-        if (aliveRef.current) setAdded(false);
-      }, ADDED_FLASH_MS);
-    } else {
-      // CartContext returns the backend's own sentence ("Only 3 units available"),
-      // which is far more useful than "Failed to add to cart".
-      setActionError(typeof result === 'string' ? result : 'We could not add that to your bag.');
-    }
-  };
-
-  // A plain function, deliberately NOT a `useCallback`: this component returns early
-  // when `product` is missing, and a hook declared after that return would change the
-  // hook count between renders.
+  /* A plain function, deliberately NOT a `useCallback`: this component returns
+     early when `product` is missing, and a hook declared after that return
+     would change the hook count between renders. */
   const handleToggleWishlist = async (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (wishlistPending) return;
 
     if (!isAuthenticated) {
-      // LF-13: carry the page they were on, so sign-in returns them here.
+      /* LF-13: carry the page they were on, so sign-in returns them here. */
       navigate('/login', { state: { from: location } });
       return;
     }
-    setActionError(null);
+    setMessage(null);
     const result = await toggleWishlist(product);
     if (!aliveRef.current) return;
     if (result !== true) {
-      setActionError(typeof result === 'string' ? result : 'We could not update your saved items.');
+      setMessage(typeof result === 'string' ? result : 'We could not update your saved items.');
     }
   };
 
-  const addLabel = added ? 'Added' : 'Add to bag';
-
   return (
-    <Card
+    <Box
       component="article"
-      className="lf-press"
+      /* <Alcove> and index.css §6 read this: it is how the hearth light goes
+         out on an unbuyable product without a single component knowing about
+         gradients, and it is why the niche never needs a `stock` prop here. */
+      data-stock={stock.state}
+      className={className ? `lf-press ${className}` : 'lf-press'}
       data-press="card"
-      onMouseEnter={canHover ? () => setHovered(true) : undefined}
-      onMouseLeave={canHover ? () => setHovered(false) : undefined}
       sx={{
         position: 'relative',
-        height: '100%',
         minWidth: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: 'var(--lf-surface)',
-        border: '1px solid var(--lf-hairline)',
-        borderRadius: 'var(--lf-r-card)',
-        transition: 'border-color var(--lf-dur-2) var(--lf-ease), box-shadow var(--lf-dur-3) var(--lf-ease)',
-        '@media (hover: hover)': {
-          '&:hover': { borderColor: 'var(--lf-border)', boxShadow: 'var(--lf-e2)' },
-        },
-        // The title anchor's ::after covers the card; keep the ring on the card itself.
-        '&:focus-within': { borderColor: 'var(--lf-border-ink)' },
+        height: '100%',
+        display: 'grid',
+        /* §6.2 — six rows; row 5 is the flexible one, so the CTA in row 6
+           bottom-aligns across the whole grid row. */
+        gridTemplateRows: 'auto auto auto auto 1fr auto',
+        /* THE NICHE IS THE FRAME: no surface, no border, no radius, no
+           shadow. The card sits directly on the page. */
+        backgroundColor: 'transparent',
+        ...sx,
       }}
+      {...rest}
     >
-      {/* ---------------- media: 1:1 mat, `cover` (DESIGN_SYSTEM §6.3) ---------------- */}
-      <Box sx={{ position: 'relative', p: 1.5, pb: 0 }}>
-        <Box
-          className="lf-media lf-ar-1x1"
-          sx={{ borderRadius: 'var(--lf-r-field)', position: 'relative' }}
-        >
-          {product.image_main ? (
-            <img
-              src={product.image_main}
-              alt={productAlt(product)}
-              data-product={product.slug || product.sku || ''}
-              width="600"
-              height="600"
-              loading="lazy"
-              decoding="async"
-              style={{
-                transition: 'opacity var(--lf-dur-3) var(--lf-ease)',
-                opacity: canHover && hovered && product.image_2 ? 0 : 1,
-                filter: stock.sellable ? 'none' : 'grayscale(0.35)',
-              }}
-            />
-          ) : (
-            <Box
-              aria-hidden="true"
-              sx={{ position: 'absolute', inset: 0, backgroundColor: 'var(--lf-surface-sunken)' }}
-            />
-          )}
-
-          {/* Second shot: a pointer-device crossfade, never a reveal, never fetched on touch. */}
-          {canHover && product.image_2 ? (
-            <img
-              src={product.image_2}
-              alt=""
-              aria-hidden="true"
-              width="600"
-              height="600"
-              loading="lazy"
-              decoding="async"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                transition: 'opacity var(--lf-dur-3) var(--lf-ease)',
-                opacity: hovered ? 1 : 0,
-              }}
-            />
-          ) : null}
-
-          {/* The scrim is decorative and NEVER captures a tap (the old one did). */}
-          {!stock.sellable ? (
-            <Box
-              aria-hidden="true"
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                zIndex: 1,
-                pointerEvents: 'none',
-                backgroundColor: 'rgba(253, 251, 249, 0.35)',
-              }}
-            />
-          ) : null}
-
-          {/* Status / merchandising badge. One at most, in priority order. */}
-          {stock.state === 'coming_soon' ? (
-            <Chip label="Coming soon" size="small" variant="statusGold" sx={BADGE_SX} />
-          ) : stock.state === 'out' ? (
-            <Chip label="Out of stock" size="small" variant="filter" sx={BADGE_SX} />
-          ) : product.is_bestseller ? (
-            <Chip label="Bestseller" size="small" variant="bestseller" sx={BADGE_SX} />
-          ) : product.is_new ? (
-            <Chip label="New" size="small" variant="statusGold" sx={BADGE_SX} />
-          ) : null}
-        </Box>
-
-        {/* ---- wishlist: OUTSIDE the anchor, above the scrim, permanently visible ---- */}
+      {/* ---- 1. THE NICHE ------------------------------------------------
+          It paints ABOVE the name anchor's full-card ::after so the wishlist
+          heart inside it is pressable, and it is `pointer-events: none` so a
+          press on the photograph still falls through to that overlay and
+          navigates. The heart opts back in. */}
+      <Alcove
+        product={product}
+        surface="card"
+        style={{ gridRow: 1, zIndex: 2, pointerEvents: 'none' }}
+      >
         <IconButton
           className="lf-press"
+          size="small"
           onClick={handleToggleWishlist}
           aria-pressed={saved}
+          aria-busy={wishlistPending || undefined}
           aria-label={
             saved ? `Remove ${product.name} from saved items` : `Save ${product.name} for later`
           }
-          disabled={wishlistPending}
           sx={{
-            position: 'absolute',
-            top: 20,
-            right: 20,
-            zIndex: 3,
+            /* `&&` doubles the specificity so this beats index.css §6's
+               `.lf-alcove > * { position: relative; z-index: 2 }`, whose
+               source order against an emotion class is not guaranteed. */
+            '&&': { position: 'absolute', zIndex: 3 },
+            right: 12,
+            bottom: 12,
+            pointerEvents: 'auto',
             width: 36,
             height: 36,
-            opacity: 0.78,
-            backgroundColor: 'var(--lf-surface)',
-            border: '1px solid var(--lf-hairline)',
+            borderRadius: 'var(--lf-r-pill)',
+            backgroundColor: 'var(--lf-paper)',
+            boxShadow: 'var(--lf-e1)',
+            /* PERMANENTLY VISIBLE — never `opacity: 0`, never behind a hover
+               (§9.5, §10.14). 0.82 → 1 is a weighting, not a reveal. */
+            opacity: 0.82,
             color: saved ? 'var(--lf-err-ink)' : 'var(--lf-ink-2)',
             transition: 'opacity var(--lf-dur-2) var(--lf-ease), color var(--lf-dur-2) var(--lf-ease)',
-            '&:hover': { opacity: 1, backgroundColor: 'var(--lf-surface)' },
+            '@media (hover:hover)': {
+              '&:hover': { opacity: 1, backgroundColor: 'var(--lf-paper)' },
+            },
             '&:focus-visible': { opacity: 1 },
-            // 44px hit area without a 44px visual circle.
+            /* A6 — a 44px hit area around a 36px visual circle. */
             '&::before': { content: '""', position: 'absolute', inset: -4 },
-            ...FOCUS_RING_SX,
           }}
         >
-          {saved ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+          {saved ? (
+            <FavoriteIcon fontSize="small" />
+          ) : (
+            <FavoriteBorderIcon fontSize="small" />
+          )}
         </IconButton>
-      </Box>
+      </Alcove>
 
-      {/* ---------------- content, in the §7 order ---------------- */}
-      <CardContent sx={{ px: 1.5, pt: 1.5, pb: 0, flexGrow: 1, '&:last-child': { pb: 0 } }}>
-        {categoryName ? (
-          <Typography variant="overline" sx={{ display: 'block', color: 'var(--lf-ink-3)', fontSize: '0.75rem' }}>
-            {categoryName}
-          </Typography>
-        ) : null}
+      {/* ---- 2. THE STATUS LEDGE — full width, beneath the niche --------- */}
+      <StockLabel stock={stock} variant="ledge" sx={{ gridRow: 2, mt: '14px' }} />
 
-        <Typography variant="h5" component="h3" sx={{ mt: categoryName ? 0.5 : 0, minHeight: 45 }}>
-          <Box
-            component={RouterLink}
-            to={path}
-            className="lf-clamp-2"
-            sx={{
-              color: 'var(--lf-ink)',
-              textDecoration: 'none',
-              // THE whole-card hit area, with no nested interactive elements (§7).
-              '&::after': { content: '""', position: 'absolute', inset: 0, zIndex: 0 },
-              '@media (hover: hover)': { '&:hover': { textDecoration: 'underline' } },
-            }}
-          >
-            {product.name}
-          </Box>
+      {/* ---- 3. CATEGORY EYEBROW ---------------------------------------- */}
+      {categoryName ? (
+        <Typography variant="eyebrow" sx={{ gridRow: 3, mt: '6px' }}>
+          {categoryName}
+        </Typography>
+      ) : null}
+
+      {/* ---- 4. THE PRODUCT NAME — h4, 19px, Inter 600 ------------------- */}
+      <Typography
+        variant="h4"
+        component="h3"
+        sx={{ gridRow: 4, mt: categoryName ? '2px' : '6px', color: 'var(--lf-ink)' }}
+      >
+        <Box
+          component={RouterLink}
+          to={path}
+          className="lf-clamp-2"
+          sx={{
+            color: 'inherit',
+            textDecoration: 'none',
+            /* THE whole-card hit area, with no nested interactive elements. */
+            '&::after': { content: '""', position: 'absolute', inset: 0, zIndex: 1 },
+            /* §2.31 / A9: where the photograph's hover lift is removed, the
+               affordance SURVIVES as an underline. The meaning survives; the
+               movement does not. */
+            '@media (prefers-reduced-motion: reduce)': {
+              '&:hover, &:focus-visible': { textDecoration: 'underline' },
+            },
+          }}
+        >
+          {product.name}
+        </Box>
+      </Typography>
+
+      {/* ---- 5. THE META BLOCK — review, size, price --------------------
+          Bottom-aligned inside the flexible row, so a wrapped name pushes the
+          slack upward and the prices stay on one line across the grid row. */}
+      <Box sx={{ gridRow: 5, alignSelf: 'end', minWidth: 0 }}>
+        {/* A REAL link to the PDP's review form. Never a star row, never a
+            count, never a 0.0 — all six products have zero Review rows. */}
+        <Typography
+          component={RouterLink}
+          to={`${path}#reviews`}
+          variant="caption"
+          onClick={(event) => event.stopPropagation()}
+          sx={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'block',
+            mt: '4px',
+            color: 'var(--lf-ink-3)',
+            textDecoration: 'none',
+            '@media (hover:hover)': {
+              '&:hover': { color: 'var(--lf-gold-ink)', textDecoration: 'underline' },
+            },
+          }}
+        >
+          {reviews.hasReviews ? 'Read reviews' : 'Be the first to review'}
         </Typography>
 
-        {/* proof row — §2e: nothing at all when there are no reviews */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minHeight: 22, mt: 0.5 }}>
-          {reviews.hasReviews ? (
-            <>
-              <Rating
-                value={reviews.average}
-                precision={0.1}
-                readOnly
-                size="small"
-                sx={{ fontSize: '0.95rem' }}
-              />
-              <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
-                {reviews.averageLabel} ({reviews.count})
-              </Typography>
-            </>
-          ) : (
-            <Typography
-              component={RouterLink}
-              to={`${path}#reviews`}
-              variant="caption"
-              sx={{
-                position: 'relative',
-                zIndex: 2,
-                color: 'var(--lf-ink-3)',
-                textDecoration: 'none',
-                '@media (hover: hover)': { '&:hover': { color: 'var(--lf-gold-ink)', textDecoration: 'underline' } },
-                ...FOCUS_RING_SX,
-              }}
-            >
-              Be the first to review
-            </Typography>
-          )}
-        </Box>
-
         {product.size ? (
-          <Typography variant="caption" sx={{ display: 'block', color: 'var(--lf-ink-3)', mt: 0.5 }}>
+          <Typography
+            variant="caption"
+            sx={{ display: 'block', mt: '2px', color: 'var(--lf-ink-3)' }}
+          >
             {product.size}
           </Typography>
         ) : null}
 
-        {/* price — never ₹undefined / ₹NaN / ₹0 (§9 #13) */}
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap', mt: 1 }}>
-          {price.hasPrice ? (
-            <>
-              <Typography
-                variant="price"
-                component="p"
-                sx={{ color: stock.sellable ? 'var(--lf-ink)' : 'var(--lf-ink-3)' }}
-              >
-                {price.priceLabel}
-              </Typography>
-              {price.compareLabel ? (
-                <Typography variant="priceCompare" component="span">
-                  {price.compareLabel}
-                </Typography>
-              ) : null}
-              {price.showSavings ? (
-                <Typography variant="badge" component="span" sx={{ color: 'var(--lf-ok-ink)' }}>
-                  Save {price.savingsPercent}%
-                </Typography>
-              ) : null}
-            </>
-          ) : (
-            <Typography variant="price" component="p" sx={{ color: 'var(--lf-ink-3)' }}>
-              Price on request
-            </Typography>
-          )}
-        </Box>
+        {/* Full --lf-ink weight in stock or out (§2.21): zero products carry a
+            discount_price, so there is no discount to suppress, and dimming a
+            true price on an item you can still reserve is a sales decision
+            wearing an accessibility costume. */}
+        <PriceBlock
+          product={product}
+          size="md"
+          sellable={stock.sellable}
+          sx={{ mt: '10px' }}
+        />
+      </Box>
 
-        <Box sx={{ mt: 0.75 }}>
-          <StockPill stock={stock} />
-        </Box>
-      </CardContent>
-
-      {/* ---------------- actions: outside the anchor, above its ::after ---------------- */}
-      <Box sx={{ position: 'relative', zIndex: 2, p: 1.5, pt: 1.5 }}>
-        {!price.hasPrice ? (
-          // §9 #13: an unpriced product gets a secondary "View details", not a buy button.
+      {/* ---- 6. THE CTA — 48px, full card width, no startIcon ----------- */}
+      <Box sx={{ gridRow: 6, position: 'relative', zIndex: 2, mt: '14px', minWidth: 0 }}>
+        {!priced ? (
+          /* §6.3: a product with no usable price never shows a buy button —
+             it degrades to a secondary `View details`, which is true. */
           <Button
             className="lf-press"
             component={RouterLink}
             to={path}
             variant="outlined"
             fullWidth
-            sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+            sx={{ minHeight: 48, whiteSpace: 'nowrap' }}
           >
             View details
           </Button>
         ) : stock.notifiable ? (
-          <NotifyMeButton
-            slug={product.slug}
-            productName={product.name}
-            fullWidth
-            label="Notify me"
-            sx={{ ...TOUCH_TARGET_SX }}
-          />
+          /* GOLD FILL, never absent, never `disabled` (§6.6, §10.12). The
+             BACK SOON ledge in row 2 has already landed by the time the eye
+             reaches it. */
+          <NotifyMe product={product} size="card" reason={stock.reason} />
         ) : (
-          <Button
-            className="lf-press"
-            variant="contained"
-            color="primary"
-            disableElevation
-            fullWidth
-            onClick={handleAddToCart}
-            aria-busy={cartPending}
-            startIcon={
-              cartPending ? (
-                <CircularProgress size={16} thickness={3.6} sx={{ color: 'inherit' }} />
-              ) : added ? (
-                <CheckIcon />
-              ) : (
-                <ShoppingBagOutlinedIcon />
-              )
-            }
-            sx={{
-              ...TOUCH_TARGET_SX,
-              ...FOCUS_RING_SX,
-              // §6.8: while loading, the label dims rather than disappearing, so the
-              // button keeps its measured width and cannot reflow the grid row.
-              ...(cartPending ? { '& .MuiButton-startIcon': { opacity: 1 }, opacity: 0.85 } : null),
-            }}
-          >
-            {addLabel}
-          </Button>
+          <AddToBag product={product} size="card" onError={setMessage} />
         )}
 
-        {/* §6.8 #2: the reason / the outcome is ALWAYS stated adjacent, never left to colour. */}
-        <Box sx={{ minHeight: 18, mt: actionError ? 0.75 : 0 }} aria-live="polite">
-          {actionError ? (
-            <Typography variant="caption" role="alert" sx={{ color: 'var(--lf-err-ink)' }}>
-              {actionError}
-            </Typography>
-          ) : stock.state === 'out' ? (
-            <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
-              Out of stock — we&apos;ll email you when it&apos;s back
-            </Typography>
-          ) : stock.state === 'coming_soon' ? (
-            <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
-              Not on sale yet — we&apos;ll email you at launch
+        {/* One adjacent message slot: the add-to-bag outcome or a wishlist
+            failure, stated in words. A button never turns red (§6.5). Zero
+            height until there is something to say. */}
+        <Box aria-live="polite" sx={{ minWidth: 0 }}>
+          {message ? (
+            <Typography
+              variant="caption"
+              role="alert"
+              sx={{ display: 'block', mt: 'var(--lf-1)', color: 'var(--lf-err-ink)' }}
+            >
+              {message}
             </Typography>
           ) : null}
         </Box>
       </Box>
-    </Card>
+    </Box>
   );
 };
 

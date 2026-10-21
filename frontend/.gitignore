@@ -1,1 +1,10 @@
 /node_modules
+/dist
+
+# Image derivatives (§7.2). 273 files / 8.44 MB, regenerated in full by
+# `npm run prebuild` from the masters in public/images/products, so committing
+# them only makes every image change a binary-heavy diff.
+/public/images/derived
+
+# src/generated/derivedImages.js is DELIBERATELY NOT IGNORED: <ProductImage>
+# imports it, so a build run without the pipeline must still resolve.

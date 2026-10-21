@@ -13,7 +13,7 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-mui': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
-          'vendor-misc': ['axios', 'react-slick', 'slick-carousel', 'react-helmet-async'],
+          'vendor-misc': ['axios', 'react-helmet-async'],
         },
       },
     },

@@ -39,7 +39,12 @@ import LinkOffOutlinedIcon from '@mui/icons-material/LinkOffOutlined';
 import SeoHead from '../components/common/SeoHead';
 import CheckYourInbox, { AuthPanel } from '../components/auth/CheckYourInbox';
 import SupportLink from '../components/common/SupportLink';
-import { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../components/common/EmptyState';
+import {
+  FOCUS_RING_SX,
+  PRIMARY_ACTION_SX,
+  StateIcon,
+  TOUCH_TARGET_SX,
+} from '../components/common/EmptyState';
 import { getApiErrorMessage, resendVerification, verifyEmail } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -165,23 +170,9 @@ const VerifyEmail = () => {
         <SeoHead title="Email verified" canonical="/verify-email" noindex />
         <AuthPanel title="Email verified">
           <Box sx={{ textAlign: 'center' }}>
-            <Box
-              aria-hidden="true"
-              sx={{
-                width: 64,
-                height: 64,
-                mx: 'auto',
-                mb: 2.5,
-                borderRadius: 'var(--lf-r-pill)',
-                backgroundColor: 'var(--lf-ok-tint)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                '& > svg': { fontSize: 28, color: 'var(--lf-ok-ink)' },
-              }}
-            >
+            <StateIcon tone="ok">
               <CheckCircleOutlineIcon />
-            </Box>
+            </StateIcon>
             <Typography variant="h4" component="h2" sx={{ color: 'var(--lf-ink)', mb: 1 }}>
               You are all set
             </Typography>
@@ -202,7 +193,7 @@ const VerifyEmail = () => {
                   ? undefined
                   : { notice: { severity: 'success', message: 'Email verified — sign in to continue.' } }
               }
-              sx={{ mt: 3, py: 1.5, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+              sx={{ mt: 3, ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
             >
               {isAuthenticated ? 'Continue shopping' : 'Continue to sign in'}
             </Button>
@@ -233,7 +224,7 @@ const VerifyEmail = () => {
                 disableElevation
                 fullWidth
                 onClick={() => window.location.reload()}
-                sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+                sx={{ ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
               >
                 Try again
               </Button>
@@ -275,23 +266,9 @@ const VerifyEmail = () => {
         title={state === 'token_expired' ? 'That link has expired' : 'That link is not valid'}
       >
         <Box sx={{ textAlign: 'center' }}>
-          <Box
-            aria-hidden="true"
-            sx={{
-              width: 64,
-              height: 64,
-              mx: 'auto',
-              mb: 2.5,
-              borderRadius: 'var(--lf-r-pill)',
-              backgroundColor: 'var(--lf-warn-tint)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              '& > svg': { fontSize: 28, color: 'var(--lf-warn-ink)' },
-            }}
-          >
+          <StateIcon tone="warn">
             <LinkOffOutlinedIcon />
-          </Box>
+          </StateIcon>
 
           <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)' }}>
             {detail}
@@ -330,7 +307,7 @@ const VerifyEmail = () => {
                 fullWidth
                 aria-disabled={sending}
                 startIcon={sending ? <CircularProgress size={16} color="inherit" /> : null}
-                sx={{ py: 1.5, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+                sx={{ ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
               >
                 {sending ? 'Sending…' : 'Send me a new link'}
               </Button>

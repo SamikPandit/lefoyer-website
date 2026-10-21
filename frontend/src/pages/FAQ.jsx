@@ -1,50 +1,155 @@
 /**
- * /faq — LF-05, LF-12, LF-29.
+ * /faq — ART_DIRECTION §5.8, §5.9 (EDITORIAL). LF-05, LF-12, LF-29.
  *
- * WHAT WAS DELETED FROM THIS PAGE, AND WHY
+ * WHAT §5.8 CHANGES HERE
+ *  - **One label per route: `Help`.** The route was called five different things across
+ *    the app ("FAQ", "FAQs", "Frequently asked questions", "Help", "Read the FAQ"), so
+ *    a shopper could not tell that the nav item and the footer link went to the same
+ *    page. The `h1`, the document title and the nav item are all `Help` now. The route
+ *    stays `/faq`; the `FAQPage` structured data stays, so nothing is lost to search.
+ *  - **The fraud notice lands here**, reworded, sharing `<SecurityNotice>` with
+ *    `/contact` so the two copies can never drift. It used to render on every route
+ *    including `/checkout` — see the note in `Contact.jsx`.
+ *  - §5.9's EDITORIAL frame replaces a centred header and a bespoke `py` pair.
+ *
+ * AND ONE ACCESSIBILITY/PERFORMANCE FIX THE SPEC MAKES CHECKABLE
+ * A14: "Accordions animate `grid-template-rows: 0fr → 1fr`." P7 bans animating `height`.
+ * MUI's `<Accordion>` is a `<Collapse>`, which animates `height` on every open and close
+ * — twelve of them on this page, on the low-end Android P4 targets. `<Disclosure>` below
+ * is the same affordance as a button and a grid row: `aria-expanded` / `aria-controls`,
+ * a 48px target, one composited property, and `visibility` so the closed panel leaves
+ * the tab order instead of hiding focusable links inside a zero-height box.
+ *
+ * WHAT WAS DELETED FROM THE ANSWERS, AND WHY (unchanged by this revision)
  *   - the wholly-natural purity claim in the first answer (claims.js
- *     `wholly-natural-ingredients`) — nothing in the repo evidences it, and it
- *     directly contradicted the homepage's "natural-**inspired** ingredients" on
- *     the same site. §4 withdraws it; the ingredient claim we can make
- *     ("Botanical Actives") now arrives from `claims.js`.
- *   - the recyclable-packaging claim (claims.js `recyclable-packaging`) —
- *     withdrawn, no evidence.
- *   - "**Expedited shipping** options are available at checkout" — there is no
- *     such option and never was. Checkout's RadioGroup offers UPI and COD, full
- *     stop. A shipping upgrade a customer cannot find is a support ticket and a
- *     refund request.
- *   - "free shipping on all orders over ₹5000 · 3-5 business days · returns within
- *     **30 days of purchase** provided the product is **gently used**" — four
- *     numbers, none of which matched the policy page, the PDP, the cart or the
- *     backend. Every number on this page is now read from `content/policy.js`
- *     (§2b #35), the same source `/shipping-returns` and the PDP read, so one
- *     grep proves they agree.
+ *     `wholly-natural-ingredients`) — nothing in the repo evidences it, and it directly
+ *     contradicted the homepage's "natural-**inspired** ingredients" on the same site.
+ *   - the recyclable-packaging claim (claims.js `recyclable-packaging`) — withdrawn.
+ *   - "**Expedited shipping** options are available at checkout" — there is no such
+ *     option and never was. Checkout offers UPI and COD, full stop.
+ *   - four delivery/returns numbers that matched neither the policy page, the PDP, the
+ *     cart nor the backend. Every number here is read from `content/policy.js`, the
+ *     same source `/shipping-returns` and the PDP read, so one grep proves they agree.
  *
- * The answers are also emitted as `FAQPage` structured data from the SAME objects
- * the page renders, so the rich result can never quote a policy the page does not
- * show.
+ * The answers are also emitted as `FAQPage` structured data from the SAME objects the
+ * page renders, so the rich result can never quote a policy the page does not show.
  */
 
 import { useMemo, useState } from 'react';
-import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Box,
-  Button,
-  Container,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Box, Button, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 import SeoHead from '../components/common/SeoHead';
 import SupportLink from '../components/common/SupportLink';
-import { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../components/common/EmptyState';
+import {
+  FOCUS_RING_SX,
+  MEASURE_SX,
+  PRIMARY_ACTION_SX,
+  PageShell,
+  SecurityNotice,
+} from '../components/common/EmptyState';
 import { useBrand } from '../content/brand';
 import { getClaim, useSubstantiatedClaims } from '../content/claims';
 import { usePolicy } from '../content/policy';
+
+/**
+ * A link that sits inside running prose. SC 2.5.8's inline exception applies, so it is
+ * NOT padded to 44px: forcing a 44px box around a word mid-sentence breaks the line box
+ * it lives in and buys no reachability.
+ */
+const PROSE_LINK_SX = { color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX };
+
+/** The standalone link that tails an answer. A6: a real 44px target. */
+const ANSWER_LINK_SX = {
+  ...PROSE_LINK_SX,
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: 44,
+};
+
+/**
+ * A14 / P7 — the accordion, as a button and one animated grid row.
+ *
+ * @param {object} props
+ * @param {string} props.id
+ * @param {string} props.question
+ * @param {boolean} props.open
+ * @param {Function} props.onToggle
+ * @param {React.ReactNode} props.children
+ */
+const Disclosure = ({ id, question, open, onToggle, children }) => (
+  <Box
+    sx={{
+      backgroundColor: 'var(--lf-paper)',
+      border: '1px solid var(--lf-hairline)',
+      borderRadius: 'var(--lf-r-card)',
+      mb: 1.5,
+      overflow: 'hidden',
+    }}
+  >
+    <Box
+      component="button"
+      type="button"
+      id={`${id}-header`}
+      aria-expanded={open}
+      aria-controls={`${id}-content`}
+      onClick={onToggle}
+      className="lf-press"
+      data-press="row"
+      sx={{
+        display: 'flex',
+        width: '100%',
+        minHeight: 48,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 2,
+        px: 2,
+        py: 1.5,
+        textAlign: 'left',
+        font: 'inherit',
+        color: 'var(--lf-ink)',
+        background: 'none',
+        border: 0,
+        cursor: 'pointer',
+        ...FOCUS_RING_SX,
+        '&:focus-visible': { ...FOCUS_RING_SX['&:focus-visible'], outlineOffset: '-2px' },
+      }}
+    >
+      <Typography variant="h6" component="h3" sx={{ color: 'inherit' }}>
+        {question}
+      </Typography>
+      <ExpandMoreIcon
+        aria-hidden="true"
+        sx={{
+          flex: '0 0 auto',
+          color: 'var(--lf-ink-3)',
+          transform: open ? 'rotate(180deg)' : 'none',
+          transition: 'transform var(--lf-dur-3) var(--lf-ease)',
+        }}
+      />
+    </Box>
+
+    <Box
+      id={`${id}-content`}
+      role="region"
+      aria-labelledby={`${id}-header`}
+      sx={{
+        display: 'grid',
+        gridTemplateRows: open ? '1fr' : '0fr',
+        /* Closed, the panel leaves the accessibility tree and the tab order, so the
+           links inside an answer are not focusable inside a zero-height box. */
+        visibility: open ? 'visible' : 'hidden',
+        transition:
+          'grid-template-rows var(--lf-dur-3) var(--lf-ease), visibility var(--lf-dur-3) var(--lf-ease)',
+      }}
+    >
+      <Box sx={{ overflow: 'hidden' }}>
+        <Box sx={{ px: 2, pb: 2 }}>{children}</Box>
+      </Box>
+    </Box>
+  </Box>
+);
 
 /**
  * Build the groups from the live policy numbers and the live claim audit.
@@ -127,11 +232,9 @@ function buildGroups({ brand, copy, policy, claims }) {
       answer:
         'We email you when the shipment status changes, with a link to that order. The courier tracking number and its tracking page are shown on the order itself, which you can open from "Your orders" while signed in.',
       extra: (
-        <Typography variant="body2" sx={{ mt: 1.5 }}>
-          <Box component={RouterLink} to="/orders" sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}>
-            Go to your orders
-          </Box>
-        </Typography>
+        <Box component={RouterLink} to="/orders" sx={{ mt: 1.5, ...ANSWER_LINK_SX }}>
+          Go to your orders
+        </Box>
       ),
     },
   ];
@@ -149,11 +252,9 @@ function buildGroups({ brand, copy, policy, claims }) {
         policy.returnWindowFrom === 'purchase' ? 'ordering' : 'delivery'
       }, with your order number and which item it is. We reply with the return instructions and the address — please wait for that before posting anything.`,
       extra: (
-        <Typography variant="body2" sx={{ mt: 1.5 }}>
-          <Box component={RouterLink} to="/shipping-returns#returns" sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}>
-            Read the full returns steps
-          </Box>
-        </Typography>
+        <Box component={RouterLink} to="/shipping-returns#returns" sx={{ mt: 1.5, ...ANSWER_LINK_SX }}>
+          Read the full returns steps
+        </Box>
       ),
     },
     {
@@ -175,11 +276,9 @@ function buildGroups({ brand, copy, policy, claims }) {
       answer:
         'Check your spam and promotions folders first. If it is genuinely not there, open the sign-in page and we will send another — up to three per hour, with a minute between them.',
       extra: (
-        <Typography variant="body2" sx={{ mt: 1.5 }}>
-          <Box component={RouterLink} to="/login" sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}>
-            Go to sign in
-          </Box>
-        </Typography>
+        <Box component={RouterLink} to="/login" sx={{ mt: 1.5, ...ANSWER_LINK_SX }}>
+          Go to sign in
+        </Box>
       ),
     },
     {
@@ -188,11 +287,9 @@ function buildGroups({ brand, copy, policy, claims }) {
       answer:
         'Use "Forgot your password?" on the sign-in page. We email you a single-use link to set a new one; it stops working as soon as the password changes.',
       extra: (
-        <Typography variant="body2" sx={{ mt: 1.5 }}>
-          <Box component={RouterLink} to="/forgot-password" sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}>
-            Reset your password
-          </Box>
-        </Typography>
+        <Box component={RouterLink} to="/forgot-password" sx={{ mt: 1.5, ...ANSWER_LINK_SX }}>
+          Reset your password
+        </Box>
       ),
     },
     {
@@ -202,11 +299,9 @@ function buildGroups({ brand, copy, policy, claims }) {
       // Profile.jsx does not have. It is a written request, and it says so.
       answer: `Write to ${brand.support.email} from the address on the account and we will action it, subject to any order still in flight. We will tell you what we have to keep and why.`,
       extra: (
-        <Typography variant="body2" sx={{ mt: 1.5 }}>
-          <Box component={RouterLink} to="/privacy-policy" sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}>
-            Read the privacy policy
-          </Box>
-        </Typography>
+        <Box component={RouterLink} to="/privacy-policy" sx={{ mt: 1.5, ...ANSWER_LINK_SX }}>
+          Read the privacy policy
+        </Box>
       ),
     },
   ];
@@ -249,96 +344,80 @@ const FAQ = () => {
   return (
     <>
       <SeoHead
-        title="Frequently asked questions"
+        title="Help"
         description={`Delivery, returns and product questions answered. ${copy.shippingLabel} · ${copy.returnsShort}.`}
         canonical="/faq"
         jsonLd={jsonLd}
       />
 
-      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 6, md: 10 } }}>
-        <Container maxWidth="md">
-          <Box sx={{ textAlign: 'center', mb: { xs: 5, md: 7 } }}>
-            <Typography variant="h1" component="h1" sx={{ color: 'var(--lf-ink)', mb: 2 }}>
-              Frequently asked questions
-            </Typography>
-            <Typography variant="subtitle1" sx={{ color: 'var(--lf-ink-2)' }}>
-              The delivery and returns numbers below are the same ones on{' '}
-              <Box component={RouterLink} to="/shipping-returns" sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}>
-                our policy page
+      <PageShell
+        archetype="editorial"
+        maxWidth="md"
+        title="Help"
+        intro={
+          <>
+            The delivery and returns numbers below are the same ones on{' '}
+            <Box component={RouterLink} to="/shipping-returns" sx={PROSE_LINK_SX}>
+              our policy page
+            </Box>
+            , on every product page and in your bag.
+          </>
+        }
+      >
+        <Stack spacing={{ xs: 4, md: 5 }}>
+          {groups
+            .filter((group) => group.items.length > 0)
+            .map((group) => (
+              <Box
+                component="section"
+                key={group.id}
+                id={group.id}
+                sx={{ scrollMarginTop: 'calc(var(--lf-nav-h) + 16px)' }}
+              >
+                <Typography variant="h4" component="h2" sx={{ color: 'var(--lf-ink)', mb: 2 }}>
+                  {group.title}
+                </Typography>
+
+                {group.items.map((item) => (
+                  <Disclosure
+                    key={item.id}
+                    id={item.id}
+                    question={item.question}
+                    open={expanded === item.id}
+                    onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
+                  >
+                    <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)' }}>
+                      {item.answer}
+                    </Typography>
+                    {item.extra || null}
+                  </Disclosure>
+                ))}
               </Box>
-              , on every product page and in your bag.
-            </Typography>
-          </Box>
+            ))}
 
-          <Stack spacing={{ xs: 4, md: 5 }}>
-            {groups
-              .filter((group) => group.items.length > 0)
-              .map((group) => (
-                <Box component="section" key={group.id} id={group.id} sx={{ scrollMarginTop: 96 }}>
-                  <Typography variant="h4" component="h2" sx={{ color: 'var(--lf-ink)', mb: 0.5 }}>
-                    {group.title}
-                  </Typography>
-                  <Box component="hr" className="lf-rule" sx={{ mb: 2 }} />
-
-                  {group.items.map((item) => (
-                    <Accordion
-                      key={item.id}
-                      elevation={0}
-                      disableGutters
-                      expanded={expanded === item.id}
-                      onChange={() => setExpanded(expanded === item.id ? null : item.id)}
-                      sx={{
-                        backgroundColor: 'var(--lf-surface)',
-                        border: '1px solid var(--lf-hairline)',
-                        borderRadius: 'var(--lf-r-card)',
-                        mb: 1.5,
-                        '&:before': { display: 'none' },
-                      }}
-                    >
-                      <AccordionSummary
-                        expandIcon={<ExpandMoreIcon />}
-                        aria-controls={`${item.id}-content`}
-                        id={`${item.id}-header`}
-                        sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
-                      >
-                        <Typography variant="h6" component="h3" sx={{ color: 'var(--lf-ink)' }}>
-                          {item.question}
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails id={`${item.id}-content`}>
-                        <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)' }}>
-                          {item.answer}
-                        </Typography>
-                        {item.extra || null}
-                      </AccordionDetails>
-                    </Accordion>
-                  ))}
-                </Box>
-              ))}
-          </Stack>
+          {/* §5.8 — the fraud notice, off every other route and onto this one. */}
+          <SecurityNotice />
 
           {/* LF-29: every dead end offers a human. */}
           <Box
+            component="section"
             sx={{
-              mt: { xs: 5, md: 7 },
               p: { xs: 3, md: 4 },
-              textAlign: 'center',
-              backgroundColor: 'var(--lf-surface-sunken)',
+              backgroundColor: 'var(--lf-mat)',
               borderRadius: 'var(--lf-r-panel)',
             }}
           >
             <Typography variant="h4" component="h2" sx={{ color: 'var(--lf-ink)', mb: 1 }}>
               Not answered here?
             </Typography>
-            <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)', maxWidth: 480, mx: 'auto' }}>
-              Send us the question and a person will answer it. You will get a
-              reference number so you can follow it up.
+            <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)', ...MEASURE_SX }}>
+              Send us the question and a person will answer it. You will get a reference
+              number so you can follow it up.
             </Typography>
             <Stack
               direction={{ xs: 'column', sm: 'row' }}
               spacing={1.5}
-              justifyContent="center"
-              alignItems="center"
+              alignItems={{ xs: 'stretch', sm: 'center' }}
               sx={{ mt: 3 }}
             >
               <Button
@@ -348,15 +427,15 @@ const FAQ = () => {
                 variant="contained"
                 color="primary"
                 disableElevation
-                sx={{ px: 3, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+                sx={{ px: 3, ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
               >
                 Contact us
               </Button>
               <SupportLink channel="email" showAddress />
             </Stack>
           </Box>
-        </Container>
-      </Box>
+        </Stack>
+      </PageShell>
     </>
   );
 };

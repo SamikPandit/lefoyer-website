@@ -18,6 +18,11 @@
  * paginator). Sending `page_size` would be silently ignored, so the constant
  * below mirrors the server's value and is used only to turn `count` into a page
  * count. It is never sent.
+ *
+ * ALCOVE (ART_DIRECTION.md §5.9): the UTILITY archetype — `h3` as the `h1`,
+ * left aligned, `py: var(--lf-sect)` — so "My orders", "Saved items" and "My
+ * account", three pages of the same kind reached from the same menu, stop
+ * rendering at three different heading sizes (§2.34).
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -43,24 +48,34 @@ const SERVER_PAGE_SIZE = 10;
 
 const AWAITING = new Set(['PENDING', 'FAILED']);
 
+/** §3.10 — the `thumb` surface caps the niche at 72px of height. */
+const THUMB_NICHE_W = 'calc(72px / var(--lf-arch-ratio))';
+
+/* P5 / CLS: the placeholder draws the ARCH at the real row's size, because
+   <OrderCard> now stands its thumbnails in niches. A rounded 56px rectangle
+   where a 72px niche is about to appear is a layout shift with extra steps. */
 const OrdersSkeleton = () => (
   <Stack spacing={2} aria-hidden="true">
     {Array.from({ length: 3 }).map((_, index) => (
       <Box
         key={index}
         sx={{
-          p: 3,
+          p: { xs: 2, md: 3 },
           borderRadius: 'var(--lf-r-card)',
           border: '1px solid var(--lf-hairline)',
-          backgroundColor: 'var(--lf-surface)',
+          backgroundColor: 'var(--lf-paper)',
         }}
       >
         <Skeleton variant="text" width="38%" height={26} />
         <Skeleton variant="text" width="24%" height={18} />
         <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
-          <Skeleton variant="rounded" width={56} height={56} />
-          <Skeleton variant="rounded" width={56} height={56} />
-          <Skeleton variant="rounded" width={56} height={56} />
+          {Array.from({ length: 3 }).map((__, thumb) => (
+            <Box
+              key={thumb}
+              className="lf-skel lf-skel--alcove lf-skel--media"
+              sx={{ flex: 'none', width: THUMB_NICHE_W }}
+            />
+          ))}
         </Stack>
       </Box>
     ))}
@@ -113,7 +128,7 @@ const Orders = () => {
   };
 
   return (
-    <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 4, md: 7 } }}>
+    <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: 'var(--lf-sect)' }}>
       <SeoHead title="My orders" noindex description="Your order history." />
       <Container maxWidth="lg">
         <Typography variant="h3" component="h1" sx={{ mb: 1 }}>

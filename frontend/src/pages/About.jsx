@@ -1,82 +1,101 @@
 /**
- * /about — LF-05 and LF-30.
+ * /about — ART_DIRECTION §5.7, §5.9 (EDITORIAL). LF-05, LF-30.
  *
- * EVERY WORD ON THIS PAGE NOW COMES FROM `content/brand.js` OR `content/claims.js`.
- * What was deleted, and why (IMPL_SPEC §4 LF-05):
- *   - "Derma-tested … pigmentation, dryness, and sun damage" — an efficacy claim
- *     against three named concerns, with no study anywhere in the repository. The
- *     softened, substantiated form ("Dermatologist-tested formulations", skin
- *     safety only) now arrives from `claims.js` instead of being typed here.
- *   - "suitable for all skin and hair types" — withdrawn as a site-wide promise.
- *     Suitability is a per-SKU fact rendered from `Product.suitable_for` on the
- *     PDP, so the page states what each product actually claims.
- *   - The **State Emblem of India** image. Its commercial use is restricted under
- *     Indian law and the repo holds no authorisation, so §4 replaces it with a
- *     typographic "Made in India" mark — which is also the only form of the claim
- *     that is actually substantiated.
- *   - "true luxury", "grounded luxury", "as effective as they are indulgent" —
- *     unprovable superlatives, the same family as the withdrawn
- *     `superlative-quality` and `visible-outcome` claims in claims.js.
+ * §5.7, verbatim: "EDITORIAL. H1 becomes the brand's own words: `The hearth is where a
+ * family gathers`, subhead `We make the shelf it gathers around.` The hand-typed `The
+ * art of the everyday ritual` — a line that appears nowhere in brand.js and belongs to
+ * no brand in particular — is deleted. The claims grid is cut from this page (it would
+ * be the third rendering of the same four strings after the marquee and the home grid;
+ * substantiation belongs once). In its place, the only image this page can own: the
+ * six-product shelf at full width, in order, as the thing the family gathers around."
  *
- * THE RETAILER-FRAMING NOTE
- * WP-12's brief says to delete About's "Curating … natural beauty products"
- * retailer line, which contradicts "we are a modern cosmetic company".
- * `grep -rn "Curating" frontend/src` is **empty**: that sentence lived in the old
- * `Footer.jsx`, which wave 1 already rewrote. The surviving manufacturer framing
- * ("We are a modern cosmetic company") is the one kept here, which is the outcome
- * the instruction was after.
+ * WHAT WENT, AND WHY
+ *  - `The art of the everyday ritual` — deleted by §5.7 by name.
+ *  - `Welcome to our hearth. Welcome home.` — the same defect one scroll lower: a
+ *    strapline in no content module, closing a page whose whole argument is that the
+ *    brand only says what it can source. It is replaced by the shelf and two actions.
+ *  - The four-card claims grid AND the single "Made in India" band above it. §5.7 cuts
+ *    the grid; the band is the same substantiation rendered once more on the same page,
+ *    and "substantiation belongs once" is the stated reason. Both claims surfaces now
+ *    live on Home ④ and in the footer's legal row. `claims.js` is untouched.
+ *  - `--lf-surface-raised` went with the claims grid — its only call site in the app
+ *    (§3.1 wants the alias deleted outright at step 9.10; now nothing blocks it).
+ *  - Five bespoke `py` pairs, two `textAlign: center` blocks and a hand-rolled
+ *    `SectionHeading` with a gold-less `.lf-rule` under it. The page frame, the title
+ *    register and the section rhythm all come from `<PageShell archetype="editorial">`
+ *    now (§5.9), which is why this file is ~40% shorter than the one it replaces.
  *
- * THE LAYOUT BUG (fixed)
- * The "Welcome to the Hearth" `Grid container` held a single `md={6}` child, so
- * half of that row was empty at every desktop width — and because MUI 7.3.5
- * ignores `item`/`xs`/`md` entirely (C-3), the column widths were not applying in
- * the first place. The row now has two real columns on `size={{...}}`.
+ * THE H1 IS NOT TYPED. `brand.territoryLine` IS the two sentences §5.7 asks for, so the
+ * page splits that one string rather than retyping half of it into a component — if the
+ * API ever overlays the territory line, the heading follows it. §10.21 in spirit.
  *
- * TYPEFACES: the inline display-serif overrides on nine headings here are gone.
- * That family is no longer part of the system (DESIGN_SYSTEM §9.1) and index.html
- * never loaded it, so every one of those headings was already falling back to a
- * system face. The brand serif is deliberately NOT used on this page either: it
- * has exactly three licensed moments site-wide and they are spent elsewhere, so a
- * fourth use would be a regression against an explicit owner decision.
+ * TYPEFACES: Fraunces has exactly three licensed uses site-wide (nav wordmark, one home
+ * interstitial, footer wordmark) and all three are spent elsewhere, so this page — the
+ * obvious place to want a fourth — deliberately does not get one (§10.6).
  */
 
-import { Box, Button, Container, Grid, Stack, Typography } from '@mui/material';
+import { Box, Button, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
-import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
-import PetsOutlinedIcon from '@mui/icons-material/PetsOutlined';
-import HealthAndSafetyOutlinedIcon from '@mui/icons-material/HealthAndSafetyOutlined';
-import SpaOutlinedIcon from '@mui/icons-material/SpaOutlined';
-import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 
 import SeoHead from '../components/common/SeoHead';
-import { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../components/common/EmptyState';
+import ProductCard from '../components/product/ProductCard';
+import ProductCardSkeleton from '../components/common/ProductCardSkeleton';
+import { PRODUCT_GRID_SX, skeletonCount } from '../components/product/productGrid';
+import {
+  FOCUS_RING_SX,
+  MEASURE_SX,
+  PRIMARY_ACTION_SX,
+  PageShell,
+  TOUCH_TARGET_SX,
+  useProductShelf,
+} from '../components/common/EmptyState';
 import { useBrand } from '../content/brand';
-import { getClaim, useSubstantiatedClaims } from '../content/claims';
 import { usePolicy } from '../content/policy';
 
-/** `claims.js` ships `iconKey` as a string so it never imports an icon set. */
-const CLAIM_ICONS = {
-  india: PlaceOutlinedIcon,
-  'cruelty-free': PetsOutlinedIcon,
-  derm: HealthAndSafetyOutlinedIcon,
-  botanical: SpaOutlinedIcon,
-  generic: AutoAwesomeOutlinedIcon,
-};
+/** The whole catalogue is six products (§Appendix); ask for a little headroom. */
+const SHELF_LIMIT = 12;
 
-const SectionHeading = ({ children, id }) => (
-  <>
-    <Typography variant="h2" component="h2" id={id} sx={{ color: 'var(--lf-ink)' }}>
-      {children}
+/**
+ * `brand.territoryLine` is "The hearth is where a family gathers. We make the shelf it
+ * gathers around." — §5.7's heading and subhead, in one approved string. Split it on
+ * the first sentence boundary rather than retyping either half.
+ * @param {string} line
+ * @returns {{heading: string, subhead: string|null}}
+ */
+function splitTerritory(line) {
+  const text = typeof line === 'string' ? line.trim() : '';
+  const boundary = text.indexOf('. ');
+  if (boundary === -1) return { heading: text, subhead: null };
+  return {
+    heading: text.slice(0, boundary),
+    subhead: text.slice(boundary + 2).trim() || null,
+  };
+}
+
+/** One editorial block: a section heading and its prose, at the 56ch measure. */
+const Chapter = ({ id, title, children }) => (
+  <Box component="section" id={id} sx={{ scrollMarginTop: 'calc(var(--lf-nav-h) + 16px)' }}>
+    <Typography variant="h2" component="h2" sx={{ color: 'var(--lf-ink)', mb: 2, ...MEASURE_SX }}>
+      {title}
     </Typography>
-    <Box component="hr" className="lf-rule" sx={{ mt: 2, mb: 4, maxWidth: 96, mx: 'auto' }} />
-  </>
+    <Stack spacing={2} sx={MEASURE_SX}>
+      {children}
+    </Stack>
+  </Box>
+);
+
+const Prose = ({ children }) => (
+  <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)' }}>
+    {children}
+  </Typography>
 );
 
 const About = () => {
   const brand = useBrand();
-  const { claims } = useSubstantiatedClaims();
   const { copy } = usePolicy();
-  const madeInIndia = getClaim('made-in-india');
+  const { products, loading } = useProductShelf({ limit: SHELF_LIMIT });
+
+  const { heading, subhead } = splitTerritory(brand.territoryLine);
 
   return (
     <>
@@ -93,213 +112,92 @@ const About = () => {
         }}
       />
 
-      <Box sx={{ backgroundColor: 'var(--lf-canvas)' }}>
-        {/* ---------------------------------------------------------- hero */}
-        <Container maxWidth="md" sx={{ py: { xs: 7, md: 12 }, textAlign: 'center' }}>
-          <Typography variant="overline" sx={{ color: 'var(--lf-gold-ink)', display: 'block', mb: 2 }}>
-            Our story
-          </Typography>
-          <Typography variant="h1" component="h1" sx={{ color: 'var(--lf-ink)', mb: 3 }}>
-            The art of the everyday ritual
-          </Typography>
-          {/* The hearth/ritual territory, which §4 explicitly preserves. */}
-          <Typography variant="subtitle1" sx={{ color: 'var(--lf-ink-2)', maxWidth: 560, mx: 'auto' }}>
-            {brand.territoryLine}
-          </Typography>
-        </Container>
-
-        {/* ------------------------------------------- made-in-india mark */}
-        {madeInIndia ? (
-          <Box
-            sx={{
-              py: { xs: 4, md: 5 },
-              backgroundColor: 'var(--lf-surface)',
-              borderTop: '1px solid var(--lf-hairline)',
-              borderBottom: '1px solid var(--lf-hairline)',
-              textAlign: 'center',
-            }}
-          >
-            <Container maxWidth="md">
-              <Typography variant="overline" sx={{ color: 'var(--lf-ink-3)', display: 'block' }}>
-                {madeInIndia.label}
-              </Typography>
-              <Typography variant="h4" component="p" sx={{ color: 'var(--lf-ink)', mt: 1 }}>
-                {madeInIndia.description}
-              </Typography>
-            </Container>
-          </Box>
-        ) : null}
-
-        {/* ------------------------------------------------ welcome / hearth */}
-        <Container maxWidth="lg" sx={{ py: { xs: 7, md: 11 } }}>
-          <Grid container spacing={{ xs: 5, md: 8 }} alignItems="center">
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Typography variant="h2" component="h2" sx={{ color: 'var(--lf-ink)', mb: 3 }}>
-                Welcome to the hearth
-              </Typography>
-              <Typography variant="body1" paragraph sx={{ color: 'var(--lf-ink-2)', lineHeight: 1.9 }}>
-                In French, <strong>{brand.wordmark}</strong> means &lsquo;the hearth&rsquo; — the heart
-                of the home: a place of warmth, comfort and belonging. We started this
-                company on a simple belief, that looking after your skin is one of the
-                small, repeated acts of care a day is actually made of.
-              </Typography>
-              <Typography variant="body1" paragraph sx={{ color: 'var(--lf-ink-2)', lineHeight: 1.9 }}>
-                We are a modern cosmetic company: we formulate and make what we sell,
-                rather than reselling someone else&rsquo;s shelf. {brand.hero.subhead}
-              </Typography>
-              <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)', lineHeight: 1.9 }}>
-                {copy.d2cAdvantage}
-              </Typography>
-            </Grid>
-
-            {/* The second column this row has been missing. It is a real panel
-                with real facts, not a spacer: the positioning statement every
-                other surface renders, plus the two policy numbers a first-time
-                visitor actually wants, read from the single policy source. */}
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Box
-                sx={{
-                  p: { xs: 3, md: 4 },
-                  backgroundColor: 'var(--lf-surface-sunken)',
-                  borderRadius: 'var(--lf-r-panel)',
-                }}
-              >
-                <Typography variant="overline" sx={{ color: 'var(--lf-gold-ink)', display: 'block', mb: 1.5 }}>
-                  What we stand for
-                </Typography>
-                <Typography variant="h4" component="p" sx={{ color: 'var(--lf-ink)', mb: 3 }}>
-                  {brand.positioningStatement}
-                </Typography>
-
-                <Stack spacing={1.25}>
-                  <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)' }}>
-                    {copy.shippingLabel} · {copy.deliveryWindow}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)' }}>
-                    {copy.returnsWindow}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
-                    Full terms on our{' '}
-                    <Box
-                      component={RouterLink}
-                      to="/shipping-returns"
-                      sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}
-                    >
-                      delivery &amp; returns page
-                    </Box>
-                    .
-                  </Typography>
-                </Stack>
-              </Box>
-            </Grid>
-          </Grid>
-        </Container>
-
-        {/* ------------------------------------------------------- the claims */}
-        {claims.length > 0 ? (
-          <Box sx={{ py: { xs: 7, md: 11 }, backgroundColor: 'var(--lf-surface)' }}>
-            <Container maxWidth="lg">
-              <Box sx={{ textAlign: 'center', mb: { xs: 5, md: 7 } }}>
-                <SectionHeading>How we formulate</SectionHeading>
-                <Typography
-                  variant="body1"
-                  sx={{ maxWidth: 560, mx: 'auto', color: 'var(--lf-ink-2)' }}
-                >
-                  These are the only claims we make, and each one is kept on a short
-                  leash: if we cannot evidence it, it does not appear on this site.
-                </Typography>
-              </Box>
-
-              <Grid container spacing={3}>
-                {claims.map((claim) => {
-                  const Icon = CLAIM_ICONS[claim.iconKey] || CLAIM_ICONS.generic;
-                  return (
-                    <Grid key={claim.id} size={{ xs: 12, sm: 6, md: 3 }}>
-                      <Box
-                        sx={{
-                          height: '100%',
-                          p: 3,
-                          textAlign: 'center',
-                          backgroundColor: 'var(--lf-surface-raised)',
-                          border: '1px solid var(--lf-hairline)',
-                          borderRadius: 'var(--lf-r-card)',
-                        }}
-                      >
-                        <Box
-                          aria-hidden="true"
-                          sx={{
-                            width: 56,
-                            height: 56,
-                            mx: 'auto',
-                            mb: 2,
-                            borderRadius: 'var(--lf-r-pill)',
-                            backgroundColor: 'var(--lf-gold-tint)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            '& > svg': { fontSize: 26, color: 'var(--lf-gold-ink)' },
-                          }}
-                        >
-                          <Icon />
-                        </Box>
-                        <Typography variant="h5" component="h3" sx={{ color: 'var(--lf-ink)', mb: 1 }}>
-                          {claim.label}
-                        </Typography>
-                        {claim.description ? (
-                          <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)' }}>
-                            {claim.description}
-                          </Typography>
-                        ) : null}
-                        {claim.footnote ? (
-                          <Typography variant="caption" component="p" sx={{ mt: 1.5, color: 'var(--lf-ink-3)' }}>
-                            {claim.footnote}
-                          </Typography>
-                        ) : null}
-                      </Box>
-                    </Grid>
-                  );
-                })}
-              </Grid>
-            </Container>
-          </Box>
-        ) : null}
-
-        {/* ------------------------------------------------------------ close */}
-        <Box sx={{ py: { xs: 7, md: 11 }, backgroundColor: 'var(--lf-surface-sunken)', textAlign: 'center' }}>
-          <Container maxWidth="md">
-            <Typography variant="h3" component="p" sx={{ color: 'var(--lf-ink)' }}>
-              Welcome to our hearth. Welcome home.
+      <PageShell
+        archetype="editorial"
+        maxWidth="lg"
+        eyebrow="Our story"
+        title={heading}
+        intro={subhead}
+      >
+        <Stack spacing={{ xs: 6, md: 9 }}>
+          <Chapter id="the-name" title="What the name means">
+            {/* The positioning statement is the etymology AND the family line, already
+                approved and already rendered by the meta description. It is the lead
+                here rather than a hand-typed paragraph that says the same thing. */}
+            <Typography variant="h4" component="p" sx={{ color: 'var(--lf-ink)' }}>
+              {brand.positioningStatement}
             </Typography>
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              spacing={1.5}
-              justifyContent="center"
-              sx={{ mt: 4 }}
+            <Prose>
+              A hearth is not an adjective. It is an arched opening in a wall with light
+              coming out of it — the warmest corner of a house, and the one a family
+              actually gathers in front of. That opening is the frame around every
+              photograph on this site, which is as close as an online shop gets to
+              putting you in the room.
+            </Prose>
+          </Chapter>
+
+          <Chapter id="how-we-work" title="How we work">
+            <Prose>
+              We are a modern cosmetic company: we formulate and make what we sell,
+              rather than reselling someone else&rsquo;s shelf.
+            </Prose>
+            <Prose>{copy.d2cAdvantage}</Prose>
+            <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
+              The delivery and returns terms are the same ones on{' '}
+              <Box
+                component={RouterLink}
+                to="/shipping-returns"
+                sx={{ color: 'var(--lf-gold-ink)', fontWeight: 500, ...FOCUS_RING_SX }}
+              >
+                our policy page
+              </Box>
+              , on every product page and in your bag.
+            </Typography>
+          </Chapter>
+
+          {/* §5.7: the only image this page can own. Until TODO(business) 4 lands —
+              one editorial hearth frame, 2400x1600 — the shelf is a better page than
+              a text-only story, and it is the real catalogue, not a mock-up. */}
+          <Box component="section" id="the-shelf">
+            <Typography variant="h2" component="h2" sx={{ color: 'var(--lf-ink)', mb: 4, ...MEASURE_SX }}>
+              The shelf it gathers around
+            </Typography>
+
+            <Box sx={PRODUCT_GRID_SX}>
+              {loading && products.length === 0 ? (
+                <ProductCardSkeleton count={skeletonCount(SHELF_LIMIT)} label="Loading products" />
+              ) : (
+                products.map((product) => (
+                  <ProductCard key={product.id ?? product.slug} product={product} />
+                ))
+              )}
+            </Box>
+          </Box>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ pt: 1 }}>
+            <Button
+              className="lf-press"
+              component={RouterLink}
+              to={brand.hero.primaryCta.to}
+              variant="contained"
+              color="primary"
+              disableElevation
+              sx={{ px: 3, ...PRIMARY_ACTION_SX, ...FOCUS_RING_SX }}
             >
-              <Button
-                className="lf-press"
-                component={RouterLink}
-                to={brand.hero.primaryCta.to}
-                variant="contained"
-                color="primary"
-                disableElevation
-                sx={{ px: 3, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
-              >
-                {brand.hero.primaryCta.label}
-              </Button>
-              <Button
-                className="lf-press"
-                component={RouterLink}
-                to={brand.support.contactPath}
-                variant="outlined"
-                sx={{ px: 3, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
-              >
-                Talk to us
-              </Button>
-            </Stack>
-          </Container>
-        </Box>
-      </Box>
+              {brand.hero.primaryCta.label}
+            </Button>
+            <Button
+              className="lf-press"
+              component={RouterLink}
+              to={brand.support.contactPath}
+              variant="outlined"
+              sx={{ px: 3, ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+            >
+              Talk to us
+            </Button>
+          </Stack>
+        </Stack>
+      </PageShell>
     </>
   );
 };

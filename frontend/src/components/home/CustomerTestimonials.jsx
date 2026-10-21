@@ -24,6 +24,14 @@
  *
  * `react-slick` is gone with the fabricated carousel (DESIGN_SYSTEM §9.9 bans
  * reaching for it; the lead uninstalls the package). Three reviews are a grid.
+ *
+ * ART_DIRECTION.md §1.3: THIS COMPONENT IS NO LONGER IN `Home.jsx`'s RENDER
+ * LIST. It is not deleted — it is correct, and it is the surface real reviews
+ * land on. It was removed from the list because it already returns `null` at
+ * zero `Review` rows, which is every row today, so keeping it mounted only
+ * made the list lie about what the homepage contains. Re-add it to `Home.jsx`
+ * when reviews exist; its deprecated tokens (`overline`, `--lf-surface`,
+ * `--lf-e-edge`) were swept at the same time so step 9.10 can drop the aliases.
  */
 
 import { useEffect, useState } from 'react';
@@ -46,17 +54,16 @@ const ReviewCard = ({ review }) => {
       sx={{
         height: '100%',
         p: { xs: 2.5, md: 3 },
-        borderRadius: 'var(--lf-r-card, 14px)',
-        border: '1px solid var(--lf-hairline, #E7E0D6)',
-        backgroundColor: 'var(--lf-surface, #FFFFFF)',
-        boxShadow: 'var(--lf-e-edge)',
+        borderRadius: 'var(--lf-r-card)',
+        border: '1px solid var(--lf-hairline)',
+        backgroundColor: 'var(--lf-paper)',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
       <FormatQuoteIcon
         aria-hidden="true"
-        sx={{ fontSize: 32, color: 'var(--lf-gold-edge, #A8803A)', mb: 1 }}
+        sx={{ fontSize: 32, color: 'var(--lf-gold-edge)', mb: 1 }}
       />
 
       <Rating
@@ -69,7 +76,7 @@ const ReviewCard = ({ review }) => {
       />
 
       {review.title ? (
-        <Typography variant="h5" component="h3" sx={{ color: 'var(--lf-ink, #14110F)', mb: 0.75 }}>
+        <Typography variant="h5" component="h3" sx={{ color: 'var(--lf-ink)', mb: 0.75 }}>
           {review.title}
         </Typography>
       ) : null}
@@ -77,7 +84,7 @@ const ReviewCard = ({ review }) => {
       <Typography
         variant="body2"
         className="lf-clamp-5"
-        sx={{ color: 'var(--lf-ink-2, #4A433C)', mb: 2 }}
+        sx={{ color: 'var(--lf-ink-2)', mb: 2 }}
       >
         {review.comment}
       </Typography>
@@ -88,7 +95,7 @@ const ReviewCard = ({ review }) => {
             <Box
               component={Link}
               to={`/product/${product.slug}`}
-              sx={{ color: 'var(--lf-gold-ink, #7A5A24)', textDecorationColor: 'currentColor' }}
+              sx={{ color: 'var(--lf-gold-ink)', textDecorationColor: 'currentColor' }}
             >
               {product.name}
             </Box>
@@ -97,7 +104,7 @@ const ReviewCard = ({ review }) => {
 
         <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
           {author ? (
-            <Typography variant="subtitle2" sx={{ color: 'var(--lf-ink, #14110F)' }}>
+            <Typography variant="subtitle2" sx={{ color: 'var(--lf-ink)' }}>
               {author}
             </Typography>
           ) : null}
@@ -137,18 +144,18 @@ const CustomerTestimonials = () => {
     <Box
       component="section"
       aria-labelledby="home-reviews-heading"
-      sx={{ py: { xs: 5, md: 8 }, backgroundColor: 'var(--lf-surface, #FFFFFF)' }}
+      sx={{ py: { xs: 5, md: 8 }, backgroundColor: 'var(--lf-paper)' }}
     >
       <Container>
         <Box sx={{ mb: { xs: 3, md: 4 } }}>
-          <Typography variant="overline" component="p" sx={{ color: 'var(--lf-gold-ink, #7A5A24)' }}>
+          <Typography variant="eyebrow" component="p" sx={{ color: 'var(--lf-gold-ink)' }}>
             From our customers
           </Typography>
           <Typography
             id="home-reviews-heading"
             variant="h2"
             component="h2"
-            sx={{ color: 'var(--lf-ink, #14110F)', mt: 0.5, mb: 1.5 }}
+            sx={{ color: 'var(--lf-ink)', mt: 0.5, mb: 1.5 }}
           >
             Reviews, as written
           </Typography>

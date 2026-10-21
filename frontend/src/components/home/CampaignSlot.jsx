@@ -1,48 +1,83 @@
 /**
- * CampaignSlot — the one admin-driven slot on the homepage.
+ * ============================================================================
+ * ② THE HEARTH — ART_DIRECTION.md §5.1② / §2.2 / §2.7 / §3.5.
  *
- * LF-25: this replaces `NewYearBanner.jsx`, a 600px panel hardcoded to one
- * seasonal headline, still live in October because retiring it needed a deploy. The slot now renders `listHomeSections()` (§2a / §2b #36), and the
- * backend server-filters to `is_active AND starts_at <= now <= ends_at`
- * (backend/content/views.py HomeSectionsView), treating a null bound as
- * open-ended. A campaign therefore starts and retires on a date in the admin,
- * with no code change and no deploy.
+ * MOVED FROM SECTION 6 TO SECTION 2. The brand's single warm moment used to
+ * sit ~2,400px down, on section 6 of 8, printing a sentence the page had
+ * already printed twice. §2.2: A RATIONED RESOURCE SPENT WHERE NOBODY LOOKS
+ * IS NOT RATIONED, IT IS WASTED. At position 2 it lands while people are
+ * still reading, and it gives the page its one hard contrast of scale — lit
+ * niche, then dark hearth — which is the structural fix for four consecutive
+ * sections being the same module.
  *
- * KIND FILTER — DOCUMENTED DISCREPANCY. IMPL_SPEC §3 WP-09 says filter to
- * `kind in ('campaign','editorial')`. The shipped model has no `campaign`
- * choice: `content.HomeSection.KIND_CHOICES` is hero / banner / product_rail /
- * editorial / category_grid / concern_grid / testimonials / newsletter. Per the
- * brief's "where a document and the code disagree, the CODE wins", this filters
- * to the real promotional kinds — `banner` and `editorial` — and keeps
- * `campaign` in the set so that if the choice is added later it renders here
- * without another frontend change.
+ * Full-bleed `.lf-hearth-section` (§3.5): the fire is in the bottom-left
+ * corner and the light falls up and right across the band. Every token is
+ * redefined inside that class with every ratio re-measured across the ENTIRE
+ * gradient, so nothing in here overrides a colour by hand.
  *
- * FALLBACK: when nothing is scheduled (the normal state), when the content app
- * is not deployed yet, or when the request fails, the slot renders an evergreen
- * editorial block built from `brand.js` — the brand's own territory line and
- * positioning statement, which assert nothing unsubstantiated (§4 LF-05). The
- * homepage never shows a hole where a campaign used to be, and never shows an
- * error panel for a decorative module.
+ * FRAUNCES LICENCE 2 OF 3 (§2.2, §10.6). `brandDisplay` at 44px rendering
+ * `brand.territoryLine` is this page's ENTIRE serif budget. The other two
+ * licences are the nav wordmark and the footer wordmark, both owned elsewhere.
+ * A fourth use is a regression against an explicit owner decision.
  *
- * TYPOGRAPHY: this is the single home interstitial that may use Fraunces
- * (`variant="brandDisplay"`), which is DESIGN_SYSTEM §2.2's second of three
- * licensed uses, on `.lf-ink-section` where the gold tokens are redefined to
- * 8.4:1 and are legible as text.
- */
+ * NO LEDGE IN THIS SECTION. §3.3 caps the page at four: hero, shelf, evidence,
+ * footer. This band gets its separation from the inversion itself.
+ *
+ * LF-25 IS PRESERVED IN FULL. This is still the one admin-driven slot on the
+ * homepage: `listHomeSections()` is server-filtered to
+ * `is_active AND starts_at <= now <= ends_at`, so a campaign starts and
+ * retires on a date in the admin with no deploy. What changed is the
+ * composition it renders into, and that the slot no longer paints a raw
+ * `<img>`: §7.3 makes `<ProductImage>` the only thing on the site that writes
+ * an `<img>`, and §5.1②'s hearth band is type and one button. An admin image
+ * on a `HomeSection` therefore no longer renders here — reported, because it
+ * is a capability this file used to have.
+ *
+ * THE BODY LINE (§5.1②: "one new line of body copy that is not
+ * `positioningStatement`"). `brand.js` carries no such line, and inventing
+ * marketing copy inside a component is the harder rule to break — it is how an
+ * unevidenced strapline reached the homepage in the first place. So the
+ * fallback renders `positioningStatement`'s FIRST sentence only: the
+ * etymology, which is what §5.1② objects to losing and which appears nowhere
+ * else on the new homepage. Its second sentence — the one that is the hero
+ * subhead verbatim, and the actual complaint — is dropped. Reported.
+ * ========================================================================== */
 
 import { useEffect, useState } from 'react';
 
-import { Box, Button, Container, Typography } from '@mui/material';
-import { Link } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Container from '@mui/material/Container';
+import Typography from '@mui/material/Typography';
+import { Link as RouterLink } from 'react-router-dom';
 
 import { useBrand } from '../../content/brand';
 import { listHomeSections } from '../../services/api';
 
-/** The kinds that belong in this slot. See the header note on `campaign`. */
+/** The kinds that belong in this slot. `content.HomeSection.KIND_CHOICES` has
+ *  no `campaign` member today; it stays in the set so that adding the choice
+ *  later needs no frontend change. */
 const SLOT_KINDS = ['campaign', 'banner', 'editorial'];
 
 /** An in-app path routes client-side; anything else is left to the browser. */
 const isInternal = (target) => typeof target === 'string' && target.startsWith('/');
+
+/**
+ * The first sentence of a brand paragraph. The wordmark is `Le foyeR.` — it
+ * ENDS IN A FULL STOP — so a naive split on ". " cuts the brand's own name in
+ * half. It is peeled off before the sentence boundary is looked for.
+ * @param {string} statement
+ * @param {string} wordmark
+ * @returns {string}
+ */
+export function firstSentence(statement, wordmark) {
+  if (typeof statement !== 'string' || !statement.trim()) return '';
+  const mark = typeof wordmark === 'string' && wordmark ? wordmark : '';
+  const head = mark && statement.startsWith(mark) ? mark : '';
+  const rest = statement.slice(head.length);
+  const match = rest.match(/^[\s\S]*?[.!?](?=\s|$)/);
+  return (match ? `${head}${match[0]}` : statement).trim();
+}
 
 const CampaignSlot = () => {
   const brand = useBrand();
@@ -62,8 +97,8 @@ const CampaignSlot = () => {
         setResolved(true);
       })
       .catch(() => {
-        // A decorative slot does not get an error panel: the evergreen block
-        // below is a complete, honest module in its own right.
+        /* A decorative slot does not get an error panel: the evergreen band
+           below is a complete, honest module in its own right. */
         if (!alive) return;
         setSection(null);
         setResolved(true);
@@ -74,107 +109,73 @@ const CampaignSlot = () => {
     };
   }, []);
 
-  /* Nothing renders until the request settles. Showing the evergreen block
+  /* Nothing renders until the request settles. Showing the evergreen band
      first and then swapping in a campaign headline would rewrite a heading
-     under the reader; this section is below the fold, so waiting costs nothing
-     above it. */
+     under the reader, and this band is the page's second section — a layout
+     shift here is charged straight to CLS (P5). */
   if (!resolved) return null;
 
+  const eyebrow = section && section.subtitle ? section.subtitle : null;
   const heading = section && section.title ? section.title : brand.territoryLine;
-  const subtitle = section ? section.subtitle : null;
-  const body = section && section.body ? section.body : brand.positioningStatement;
-  const image = section ? section.image : null;
+  const body =
+    section && section.body
+      ? section.body
+      : firstSentence(brand.positioningStatement, brand.wordmark);
   const ctaLabel = section && section.cta_label ? section.cta_label : 'Shop all products';
   const ctaTarget = section && section.cta_target ? section.cta_target : '/products';
 
   const ctaProps = isInternal(ctaTarget)
-    ? { component: Link, to: ctaTarget }
+    ? { component: RouterLink, to: ctaTarget }
     : { component: 'a', href: ctaTarget, rel: 'noopener' };
 
   return (
     <Box
       component="section"
-      className="lf-ink-section"
-      aria-labelledby="home-campaign-heading"
-      sx={{
-        backgroundColor: 'var(--lf-canvas, #14110F)',
-        color: 'var(--lf-ink, #F7F4F0)',
-        py: { xs: 6, md: 10 },
-      }}
+      className="lf-hearth-section"
+      aria-labelledby="home-hearth-heading"
+      sx={{ py: 'var(--lf-sect-lg)' }}
     >
       <Container>
-        <Box sx={{ maxWidth: 720 }}>
-          {subtitle ? (
-            <Typography
-              variant="overline"
-              component="p"
-              sx={{ color: 'var(--lf-gold-ink, #E3C78C)', mb: 1 }}
-            >
-              {subtitle}
+        {/* Left-aligned, 56ch measure (§5.1②). */}
+        <Box sx={{ maxWidth: '56ch', minWidth: 0 }}>
+          {eyebrow ? (
+            <Typography variant="eyebrow" sx={{ mb: 'var(--lf-2)' }}>
+              {eyebrow}
             </Typography>
           ) : null}
 
-          <Typography
-            id="home-campaign-heading"
-            variant="brandDisplay"
-            component="h2"
-            sx={{ color: 'var(--lf-ink, #F7F4F0)', mb: 2 }}
-          >
+          <Typography id="home-hearth-heading" variant="brandDisplay" component="h2">
             {heading}
           </Typography>
 
-          <Typography
-            variant="body1"
-            sx={{ color: 'var(--lf-ink-2, #D3CBC2)', mb: 3, maxWidth: 560 }}
-          >
-            {body}
-          </Typography>
+          {body ? (
+            <Typography variant="body1" component="p" sx={{ mt: '20px', color: 'var(--lf-ink-2)' }}>
+              {body}
+            </Typography>
+          ) : null}
 
+          {/* A GHOST BUTTON (§5.1②): --lf-ink label, which the class has
+              already inverted to #FBF4E8 at 16.59:1, a 1px --lf-gold-edge
+              boundary (5.10:1 on the band, 3.19:1 at the glow's brightest
+              point — SC 1.4.11 holds across the whole gradient), and the
+              #E3C78C focus ring the class supplies as --lf-focus. */}
           <Button
             {...ctaProps}
             variant="outlined"
             className="lf-press"
             sx={{
-              minHeight: 48,
-              px: 4,
-              borderColor: 'var(--lf-border-ink, #F7F4F0)',
-              color: 'var(--lf-ink, #F7F4F0)',
+              mt: '28px',
+              minHeight: 52,
+              px: 'var(--lf-6)',
+              borderColor: 'var(--lf-gold-edge)',
               '@media (hover:hover)': {
-                '&:hover': {
-                  backgroundColor: 'var(--lf-ink, #F7F4F0)',
-                  color: 'var(--lf-on-ink, #14110F)',
-                  borderColor: 'var(--lf-border-ink, #F7F4F0)',
-                },
+                '&:hover': { borderColor: 'var(--lf-gold-edge)' },
               },
             }}
           >
             {ctaLabel}
           </Button>
         </Box>
-
-        {image ? (
-          <Box
-            sx={{
-              mt: { xs: 4, md: 6 },
-              borderRadius: 'var(--lf-r-media, 24px)',
-              overflow: 'hidden',
-              aspectRatio: { xs: '4 / 5', sm: '16 / 9', md: '21 / 9' },
-              backgroundColor: 'var(--lf-surface-sunken, #211E1B)',
-            }}
-          >
-            <Box
-              component="img"
-              src={image}
-              /* The campaign's own words describe it; an invented alt would be
-                 worse than none, so the heading carries the meaning and the
-                 image is presentational when the admin gave no text. */
-              alt={section && section.title ? section.title : ''}
-              loading="lazy"
-              decoding="async"
-              sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            />
-          </Box>
-        ) : null}
       </Container>
     </Box>
   );

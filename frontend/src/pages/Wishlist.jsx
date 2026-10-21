@@ -1,26 +1,42 @@
 /**
- * Wishlist — the saved-items page.
+ * ============================================================================
+ * Wishlist — the saved-items page. ART_DIRECTION.md §5.9 (UTILITY archetype).
  *
- * WHAT CHANGED
- *  - It destructured `removeFromWishlist` and never called it, and kept three pieces of
- *    `Snackbar` state (`openSnackbar`, `snackbarMessage`, `snackbarSeverity`) feeding a
- *    `<Snackbar>` that nothing could ever open. All of it is gone; removing an item is
- *    the heart on `ProductCard`, which is now actually wired (LF-23), so there is one
+ * THIS PASS (§4, §5.9)
+ *  - **The grid moves to `components/product/productGrid.js`.** It imported
+ *    `PRODUCT_GRID_SX` from `RelatedProducts` — `repeat(auto-fill,
+ *    minmax(156px, 1fr))`, the one number behind four of the site's most
+ *    visible defects (§1.3, §10.5). A related-products rail does not own the
+ *    catalogue's geometry. The listing, the home shelf, the PDP rail and this
+ *    page now share ONE explicit 1 / 2 / 3-column schedule with a 288px floor.
+ *  - **`minHeight: '100vh'` is deleted** (§5.9, by name). This page sits inside
+ *    `Layout`'s flex column, below a nav spacer and above the footer, so a
+ *    100vh minimum guaranteed a vertical scrollbar and pushed the footer
+ *    off-screen **on every single visit** — including when the page was showing
+ *    a 64px empty-state circle. `Layout`'s `flexGrow: 1` on `<main>` already
+ *    does what it was reaching for.
+ *  - **UTILITY heading.** `variant="h3" component="h1"` at 26px with
+ *    `py: var(--lf-sect)`, so "Saved items" stops rendering 50% larger than
+ *    "My orders" and "My account" — three pages of the same kind reached from
+ *    the same menu (§2.34).
+ *  - `.lf-rule` → `.lf-ledge` (§2.3): the 1px gold hairline composited to
+ *    1.30:1 over canvas and is deleted system-wide; the ledge is 2px solid
+ *    `--lf-gold` at 1.96:1 with a warm under-shadow. One per page here, well
+ *    inside the four-per-page maximum.
+ *  - The skeleton count is **derived** from what is about to render rather
+ *    than hardcoded to 4 (§7.5 rule 3, P5).
+ *
+ * EARLIER PASSES, UNCHANGED
+ *  - It destructured `removeFromWishlist` and never called it, and kept three
+ *    pieces of `Snackbar` state feeding a `<Snackbar>` nothing could open.
+ *    Removing an item is the heart on `<ProductCard>` (LF-23), so there is one
  *    implementation of that action rather than two.
- *  - It hard-coded a display-serif `fontFamily` twice — a font this app has
- *    never loaded (DESIGN_SYSTEM: referenced in seven files, loaded in none). The headings
- *    use the theme's own display face.
- *  - `wishlist.products` is rendered as real nested products, which is what §2b #26
- *    makes the backend serialise (it used to emit bare PKs).
- *  - It had three states (`loading` / `error` / empty-or-full) driven by a context that
- *    starts `wishlist === null`, so a signed-in shopper saw "Your wishlist is empty"
- *    for as long as the fetch took. `initialised` from `WishlistContext` separates
- *    "not fetched yet" from "nothing saved", and the empty and error states are the
- *    shared ones (DESIGN_SYSTEM §6.9).
- *  - Its legacy v1 `Grid` props render unstyled on MUI 7.3.5 (the props are ignored
- *    outright). The layout is now the same CSS grid every other product surface uses, so
- *    there is no `Grid` in this package at all.
- */
+ *  - `wishlist.products` renders as real nested products.
+ *  - `initialised` from `WishlistContext` separates "not fetched yet" from
+ *    "nothing saved", so a signed-in shopper no longer reads "empty" for as
+ *    long as the fetch takes. The empty and error states are the shared ones.
+ *  - No `Grid`: its legacy v1 props render unstyled on MUI 7.3.5.
+ * ========================================================================== */
 
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
@@ -33,7 +49,7 @@ import EmptyState from '../components/common/EmptyState';
 import ErrorState from '../components/common/ErrorState';
 import ProductCardSkeleton, { useSkeletonDelay } from '../components/common/ProductCardSkeleton';
 import ProductCard from '../components/product/ProductCard';
-import { PRODUCT_GRID_SX } from '../components/product/RelatedProducts';
+import { PRODUCT_GRID_SX, skeletonCount } from '../components/product/productGrid';
 
 const Wishlist = () => {
   const { products, loading, initialised, error, refresh } = useWishlist();
@@ -41,15 +57,15 @@ const Wishlist = () => {
   const showSkeletons = useSkeletonDelay(waiting);
 
   return (
-    <Box sx={{ backgroundColor: 'var(--lf-canvas)', minHeight: '100vh', py: { xs: 3, md: 5 } }}>
+    <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: 'var(--lf-sect)' }}>
       {/* A personal page: useful to the owner, worthless in an index. */}
       <SeoHead title="Saved items" noindex />
 
       <Container maxWidth="lg">
-        <Typography variant="h1" component="h1" sx={{ mb: 1 }}>
+        <Typography variant="h3" component="h1" sx={{ color: 'var(--lf-ink)' }}>
           Saved items
         </Typography>
-        <Box className="lf-rule" sx={{ mb: 3 }} />
+        <Box className="lf-ledge" sx={{ mt: 2, mb: 3 }} />
 
         {error && !waiting ? (
           <ErrorState
@@ -61,7 +77,12 @@ const Wishlist = () => {
           />
         ) : waiting ? (
           <Box sx={PRODUCT_GRID_SX} aria-busy="true">
-            {showSkeletons ? <ProductCardSkeleton count={4} label="Loading your saved items" /> : null}
+            {showSkeletons ? (
+              <ProductCardSkeleton
+                count={skeletonCount(products.length || 3)}
+                label="Loading your saved items"
+              />
+            ) : null}
           </Box>
         ) : products.length === 0 ? (
           <EmptyState
@@ -74,7 +95,7 @@ const Wishlist = () => {
           />
         ) : (
           <>
-            <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)', mb: 2 }} role="status">
+            <Typography variant="caption" component="p" sx={{ color: 'var(--lf-ink-3)', mb: 2 }} role="status">
               {`${products.length} ${products.length === 1 ? 'item' : 'items'} saved`}
             </Typography>
             <Box sx={PRODUCT_GRID_SX}>

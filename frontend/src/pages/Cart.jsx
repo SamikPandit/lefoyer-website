@@ -14,6 +14,19 @@
  *   6. "Secure Checkout - SSL Encrypted" — a caption asserting the baseline.
  *
  * Money comes from the server and nowhere else; see `cart/CartTotals.jsx`.
+ *
+ * ALCOVE (ART_DIRECTION.md §5.4, §5.9): the UTILITY archetype — `h3`
+ * rendered as the `h1`, left aligned, `py: var(--lf-sect)` — with lines 1–7 in
+ * ONE panel with internal hairlines, 88px `<Alcove surface="row">` thumbnails
+ * and the summary sticky from `md` up. The free-delivery line is read from
+ * `policy.js`, never typed. **The empty state passes `<CrossSell />` as
+ * `children`** (§2.28): `EmptyState.jsx:214` exists solely for this and its own
+ * docstring uses the empty cart as THE example, yet no caller had ever used it,
+ * so six routes rendered a 64px beige circle and stopped.
+ *
+ * Panels carry NO shadow (§3.11: one elevation ramp, and a panel is not a
+ * floating thing), and `--lf-e-edge` — the inset highlight that propped up the
+ * deleted card frame — is gone from every one of them.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -33,7 +46,7 @@ import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import { Link as RouterLink } from 'react-router-dom';
 
 import SeoHead from '../components/common/SeoHead';
-import EmptyState from '../components/common/EmptyState';
+import EmptyState, { useProductShelf } from '../components/common/EmptyState';
 import ErrorState from '../components/common/ErrorState';
 import SupportLink from '../components/common/SupportLink';
 import PincodeCheck, { getRememberedPincode } from '../components/common/PincodeCheck';
@@ -52,6 +65,12 @@ import { useBrand } from '../content/brand';
 
 const SKELETON_ROWS = 3;
 
+/** §3.10 — the `row` surface caps the niche at 88px of height. */
+const ROW_NICHE_W = 'calc(88px / var(--lf-arch-ratio))';
+
+/* P5 / CLS ≤ 0.05: the placeholder is the ARCH, at the real row's size, so the
+   first paint and the loaded paint are the same shape. A rounded rectangle
+   where a niche is about to appear is a layout shift with extra steps. */
 const CartSkeleton = () => (
   <Grid container spacing={{ xs: 3, md: 4 }}>
     <Grid size={{ xs: 12, md: 8 }}>
@@ -60,7 +79,7 @@ const CartSkeleton = () => (
           p: { xs: 2, md: 3 },
           borderRadius: 'var(--lf-r-panel)',
           border: '1px solid var(--lf-hairline)',
-          backgroundColor: 'var(--lf-surface)',
+          backgroundColor: 'var(--lf-paper)',
         }}
       >
         {Array.from({ length: SKELETON_ROWS }).map((_, index) => (
@@ -73,11 +92,14 @@ const CartSkeleton = () => (
               borderBottom: index === SKELETON_ROWS - 1 ? 'none' : '1px solid var(--lf-hairline)',
             }}
           >
-            <Skeleton variant="rounded" width={88} height={88} />
+            <Box
+              className="lf-skel lf-skel--alcove lf-skel--media"
+              sx={{ flex: 'none', width: ROW_NICHE_W }}
+            />
             <Box sx={{ flexGrow: 1 }}>
               <Skeleton variant="text" width="55%" height={22} />
               <Skeleton variant="text" width="28%" height={16} />
-              <Skeleton variant="rounded" width={132} height={36} sx={{ mt: 1.5 }} />
+              <Skeleton variant="rounded" width={132} height={44} sx={{ mt: 1.5 }} />
             </Box>
           </Stack>
         ))}
@@ -89,7 +111,7 @@ const CartSkeleton = () => (
           p: { xs: 2, md: 3 },
           borderRadius: 'var(--lf-r-panel)',
           border: '1px solid var(--lf-hairline)',
-          backgroundColor: 'var(--lf-surface)',
+          backgroundColor: 'var(--lf-paper)',
         }}
       >
         <Skeleton variant="text" width="50%" height={28} />
@@ -116,7 +138,7 @@ const ReassuranceStrip = () => {
       sx={{
         p: 2,
         borderRadius: 'var(--lf-r-field)',
-        backgroundColor: 'var(--lf-surface-sunken)',
+        backgroundColor: 'var(--lf-mat)',
       }}
     >
       <Stack spacing={0.75}>
@@ -257,6 +279,19 @@ const Cart = () => {
   }, []);
 
   const lines = summary ? summary.lines : [];
+
+  /* §2.28 — the empty bag shows REAL PRODUCTS. `summary.crossSell` is the
+     server's own pick, but `cart/summary/` is IsAuthenticated, so a guest's
+     empty bag has none and the slot rendered a ~400px void. The shared
+     `useProductShelf()` (the same source §5.8's table gives 404, Search-idle,
+     Profile and Orders) fills it, and only fetches when it will be shown. */
+  const { products: shelfFallback } = useProductShelf({
+    inStockOnly: true,
+    limit: 4,
+    enabled: lines.length === 0,
+  });
+  const emptyBagPicks = summary?.crossSell?.length ? summary.crossSell : shelfFallback;
+
   const unavailableByProduct = useMemo(() => {
     const map = new Map();
     (summary?.unavailable || []).forEach((entry) => {
@@ -275,7 +310,7 @@ const Cart = () => {
 
   if (showSkeleton) {
     return (
-      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 4, md: 6 } }}>
+      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: 'var(--lf-sect)' }}>
         <SeoHead title="Your bag" noindex description="Review the items in your bag." />
         <Container maxWidth="lg">
           <Typography variant="h3" component="h1" sx={{ mb: 3 }}>
@@ -292,7 +327,7 @@ const Cart = () => {
   // nothing in your bag". That was the old page's worst state.
   if (!summary || (lines.length === 0 && (summaryError || cartError))) {
     return (
-      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 4, md: 8 } }}>
+      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: 'var(--lf-sect)' }}>
         <SeoHead title="Your bag" noindex description="Review the items in your bag." />
         <Container maxWidth="sm">
           <ErrorState
@@ -320,9 +355,16 @@ const Cart = () => {
   /* ---------------- empty ---------------- */
   if (lines.length === 0) {
     return (
-      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 4, md: 8 } }}>
+      <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: 'var(--lf-sect)' }}>
         <SeoHead title="Your bag" noindex description="Review the items in your bag." />
-        <Container maxWidth="sm">
+        {/* §2.28/§5.4: the empty state shows REAL PRODUCTS, not a 64px beige
+            circle and a full stop. `summary.crossSell` is the server's own
+            pick — with an empty bag `_cross_sell([])` falls back to the wider
+            catalogue, so it is the shop. A guest's bag is priced client-side
+            (`cart/summary/` is IsAuthenticated), so there is no server pick to
+            show, so the shared `useProductShelf()` supplies the shelf instead
+            — the slot is never empty and the void §2.28 names never returns. */}
+        <Container maxWidth="md">
           <EmptyState
             variant="page"
             headingComponent="h1"
@@ -331,16 +373,18 @@ const Cart = () => {
             message="Nothing in here yet. The full range is two taps away."
             primaryLabel="Shop all skincare"
             primaryTo="/products"
-            secondaryLabel="Read the FAQ"
+            secondaryLabel="Help"
             secondaryTo="/faq"
-          />
+          >
+            <CrossSell products={emptyBagPicks} title="Start here" />
+          </EmptyState>
         </Container>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 4, md: 6 } }}>
+    <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: 'var(--lf-sect)' }}>
       <SeoHead title="Your bag" noindex description="Review the items in your bag." />
       <Container maxWidth="lg">
         <Typography variant="h3" component="h1" sx={{ mb: 1 }}>
@@ -357,7 +401,6 @@ const Cart = () => {
             sx={{ mb: 3 }}
             action={
               <Button
-                size="small"
                 variant="outlined"
                 onClick={() => {
                   refreshCart();
@@ -406,8 +449,7 @@ const Cart = () => {
                 py: 0.5,
                 borderRadius: 'var(--lf-r-panel)',
                 border: '1px solid var(--lf-hairline)',
-                backgroundColor: 'var(--lf-surface)',
-                boxShadow: 'var(--lf-e-edge), var(--lf-e1)',
+                backgroundColor: 'var(--lf-paper)',
               }}
             >
               <Box component="ul" sx={{ m: 0, p: 0 }}>
@@ -429,21 +471,15 @@ const Cart = () => {
               </Box>
             </Box>
 
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              spacing={1.5}
+            <Button
+              component={RouterLink}
+              to="/products"
+              variant="text"
+              startIcon={<ArrowBackIcon fontSize="small" />}
               sx={{ mt: 2.5 }}
-              alignItems={{ xs: 'stretch', sm: 'center' }}
             >
-              <Button
-                component={RouterLink}
-                to="/products"
-                variant="text"
-                startIcon={<ArrowBackIcon fontSize="small" />}
-              >
-                Continue shopping
-              </Button>
-            </Stack>
+              Continue shopping
+            </Button>
 
             <Box sx={{ mt: 3, maxWidth: 420 }}>
               <PincodeCheck

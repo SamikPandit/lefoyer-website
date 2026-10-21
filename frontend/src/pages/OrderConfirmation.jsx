@@ -1,5 +1,6 @@
 /**
- * OrderConfirmation — the page LF-15 is about.
+ * ============================================================================
+ * OrderConfirmation — the page LF-15 is about, and §2.26 / §5.6 fix.
  *
  * WHAT WAS WRONG (C-23, all verified in the old file)
  *   `setPaymentStatus(status || 'success')` defaulted an unverified,
@@ -27,7 +28,38 @@
  *   `purchase_event_pending` flag and closed out with
  *   `POST mark-purchase-tracked/` (§2g). A refresh, a second tab or a shared
  *   link fires nothing, because the server says it is no longer pending.
- */
+ *
+ * ---------------------------------------------------------------------------
+ * THE COD ARM (ART_DIRECTION.md §2.26, §5.6) — the defect this adds
+ *
+ *   This file contained the string "COD" **zero times**, while `Checkout.jsx`
+ *   routes a COD order straight to it. `services.create_order` calls
+ *   `confirm_order` for COD at creation, so the usual answer is COMPLETED —
+ *   but every surface here keyed off the PAYMENT state alone, so:
+ *     · the money block was gated on `paymentStatus === 'COMPLETED'`, and any
+ *       COD order that had not yet been confirmed (a slow worker, a retry that
+ *       switched method, a 503 from the gateway probe) showed an amber
+ *       hourglass reading "Confirming your payment", a progress bar and a
+ *       3→6→12→24 s poll — with no items, no total and no address;
+ *     · and when it WAS confirmed, the total was labelled **"Paid"** on an
+ *       order where nothing has been paid yet.
+ *
+ *   So: the COD arm is decided BEFORE the payment state (§5.6) — `tone: 'ok'`,
+ *   `CheckCircleOutline`, **`Order placed`**, body `Pay ₹X to the courier when
+ *   it arrives.` **It never polls and never renders `LinearProgress`.**
+ *   `showMoney` becomes `COMPLETED || isCOD`, and the `Paid` row relabels to
+ *   **`To pay on delivery`**.
+ *
+ *   PRESENTATION ONLY. Not one line of the payment state machine, the purchase
+ *   event gate, the retry path or the cart restore is changed; the COD arm only
+ *   decides what the page SAYS about the state the server reported, and stops
+ *   re-asking a question that has no pending answer.
+ *
+ * AND THEN IT IS A BRAND MOMENT, NOT A BANK RECEIPT (§5.6): `md` container,
+ * a niche beside every line item — the same arch the product stood in on the
+ * shelf — and a hearth band carrying `brand.territoryLine` to close. It is the
+ * highest-trust moment in the store and it used to look like a failure screen.
+ * ========================================================================== */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Alert from '@mui/material/Alert';
@@ -50,6 +82,7 @@ import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'rea
 import SeoHead from '../components/common/SeoHead';
 import SupportLink from '../components/common/SupportLink';
 import ErrorState from '../components/common/ErrorState';
+import Alcove from '../components/common/Alcove';
 import { formatMoney } from '../components/cart/CartTotals';
 import { useCart } from '../context/CartContext';
 import {
@@ -65,12 +98,22 @@ import {
   restoreCartFromOrder,
   retryPayment,
 } from '../services/api';
+import { useBrand } from '../content/brand';
 import { usePolicy } from '../content/policy';
 
 /** 4 polls after the first read: ~3s + 6s + 9s + 12s = 30s, then terminal. */
 const POLL_DELAYS_MS = [3000, 6000, 9000, 12000];
 
 const PENDING_STATES = new Set(['PENDING']);
+
+/** §5.6's COD arm covers the two states a cash order can honestly be in. */
+const COD_ARM_STATES = new Set(['COMPLETED', 'PENDING']);
+
+/** §3.10 — the `thumb` surface caps the niche at 72px of height. */
+const THUMB_NICHE_W = 'calc(72px / var(--lf-arch-ratio))';
+
+/** True when the SERVER says this order is cash on delivery. Never inferred. */
+const isCodOrder = (body) => String(body?.payment_method || '').toUpperCase() === 'COD';
 
 /* The six states of §2f, as the customer sees them. `message` is NOT written
    here when the server sent one: the backend's `STATE_MESSAGES` already carry
@@ -117,6 +160,13 @@ const STATE_PRESENTATION = {
   },
 };
 
+/** §5.6 — the COD arm, decided before the payment state. */
+const COD_PRESENTATION = {
+  tone: 'ok',
+  Icon: CheckCircleOutlineIcon,
+  title: 'Order placed',
+};
+
 const TONE_COLOR = {
   ok: 'var(--lf-ok-ink)',
   warn: 'var(--lf-warn-ink)',
@@ -129,12 +179,75 @@ const TONE_TINT = {
   err: 'var(--lf-err-tint)',
 };
 
+/**
+ * One order line, with the niche the product stood in on the shelf (§5.6).
+ *
+ * `OrderItemSerializer` carries both the live `product` (ProductLineSerializer:
+ * `image_main`, `size`, `slug`) and the order's own `product_name` /
+ * `product_image` SNAPSHOTS, and the snapshots win — a renamed or re-SKU'd
+ * product must not rewrite what the customer actually bought. The merged shape
+ * below hands <Alcove> a payload with the snapshot name and whichever image
+ * exists; nothing is typed into this component (§10.21), and a line whose
+ * product has no image gets an empty lit shelf rather than a broken `src`
+ * (§7.5 rule 2).
+ */
+const OrderLine = ({ item }) => {
+  const lineProduct = {
+    ...(item.product || {}),
+    name: item.product_name || item.product?.name || '',
+    image_main: item.product?.image_main || item.product_image || null,
+  };
+  const href = item.product_slug ? `/product/${item.product_slug}` : null;
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+      <Box sx={{ flex: 'none', width: THUMB_NICHE_W }}>
+        <Alcove product={lineProduct} surface="thumb" alt="" />
+      </Box>
+      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+        {href ? (
+          <Typography
+            variant="h6"
+            component={RouterLink}
+            to={href}
+            sx={{
+              color: 'var(--lf-ink)',
+              textDecoration: 'none',
+              display: 'block',
+              '@media (hover:hover)': { '&:hover': { textDecoration: 'underline' } },
+            }}
+          >
+            {lineProduct.name}
+          </Typography>
+        ) : (
+          <Typography variant="h6" component="p" sx={{ color: 'var(--lf-ink)' }}>
+            {lineProduct.name}
+          </Typography>
+        )}
+        <Typography variant="caption" component="p" sx={{ color: 'var(--lf-ink-3)' }} data-tnum="true">
+          {lineProduct.size ? `${lineProduct.size} · ` : ''}
+          {formatMoney(item.price)} × {item.quantity}
+        </Typography>
+      </Box>
+      <Typography
+        variant="price"
+        component="p"
+        data-tnum="true"
+        sx={{ color: 'var(--lf-ink)', whiteSpace: 'nowrap' }}
+      >
+        {formatMoney(item.line_total)}
+      </Typography>
+    </Box>
+  );
+};
+
 const OrderConfirmation = () => {
   const { id: routeId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { refresh: refreshCart } = useCart();
   const { copy } = usePolicy();
+  const brand = useBrand();
 
   /** Only a hint about which gateway attempt to look up. Never a verdict. */
   const providerRef = searchParams.get('ref') || undefined;
@@ -245,17 +358,22 @@ const OrderConfirmation = () => {
         setStatus(body);
         setError(null);
         handleVerifiedState(body);
-        if (PENDING_STATES.has(body?.payment_status)) schedule();
+        /* §5.6: a COD order is NEVER polled. There is no gateway answer on its
+           way — `create_order` confirms it itself — so re-asking every three
+           seconds can only produce the amber hourglass §2.26 is about. */
+        if (!isCodOrder(body) && PENDING_STATES.has(body?.payment_status)) schedule();
         else setPolling(false);
       } catch (requestError) {
         if (cancelled) return;
         const data = requestError?.response?.data;
         // 503 is the contract's "gateway unreachable" answer and it carries
         // `payment_status: 'PENDING'`. It is NOT a page error — it is a reason
-        // to keep asking within the budget.
+        // to keep asking within the budget. A COD order has no gateway to be
+        // unreachable, so it is not re-asked either.
         if (requestError?.response?.status === 503 && data?.payment_status) {
           setStatus((previous) => previous || { ...data, order_id: orderId });
-          schedule();
+          if (!isCodOrder(data)) schedule();
+          else setPolling(false);
         } else {
           setError(requestError);
           setPolling(false);
@@ -334,10 +452,10 @@ const OrderConfirmation = () => {
 
   if (resolvingId || (loading && !status && !error)) {
     return (
-      <Container maxWidth="sm" sx={{ py: { xs: 6, md: 10 } }}>
+      <Container maxWidth="sm" sx={{ py: 'var(--lf-sect-lg)' }}>
         <SeoHead title="Your order" noindex />
         <Stack spacing={2} alignItems="center">
-          <CircularProgress size={28} />
+          <CircularProgress size={28} thickness={3.6} />
           <Typography variant="h5" component="h1">
             Checking your payment
           </Typography>
@@ -352,7 +470,7 @@ const OrderConfirmation = () => {
 
   if (!orderId) {
     return (
-      <Container maxWidth="sm" sx={{ py: { xs: 6, md: 10 } }}>
+      <Container maxWidth="sm" sx={{ py: 'var(--lf-sect-lg)' }}>
         <SeoHead title="Your order" noindex />
         <ErrorState
           variant="page"
@@ -369,7 +487,7 @@ const OrderConfirmation = () => {
 
   if (error && !status) {
     return (
-      <Container maxWidth="sm" sx={{ py: { xs: 6, md: 10 } }}>
+      <Container maxWidth="sm" sx={{ py: 'var(--lf-sect-lg)' }}>
         <SeoHead title="Your order" noindex />
         <ErrorState
           variant="page"
@@ -389,31 +507,70 @@ const OrderConfirmation = () => {
   }
 
   const paymentStatus = status?.payment_status || 'PENDING';
-  const isPending = PENDING_STATES.has(paymentStatus);
-  const stillPolling = isPending && polling && !exhausted;
-  const presentation = STATE_PRESENTATION[paymentStatus] || STATE_PRESENTATION.PENDING;
-  const { Icon } = presentation;
   const orderNumber = status?.order_number || `#${orderId}`;
   const nextActions = Array.isArray(status?.next_actions) ? status.next_actions : [];
 
+  /* §5.6 — THE COD ARM, decided before the payment state.
+     It is narrowed to the two states a cash order can honestly be in: a COD
+     order that was CANCELLED or REFUNDED must not read "Order placed", and the
+     literal "branch before paymentStatus" would say exactly that. COMPLETED is
+     the normal answer (`create_order` confirms COD itself) and PENDING is the
+     window before the confirmation lands. */
+  const isCOD = isCodOrder(status);
+  const codArm = isCOD && COD_ARM_STATES.has(paymentStatus);
+
+  /* A COD order is never pending ON THIS PAGE: there is no answer coming. */
+  const isPending = !codArm && PENDING_STATES.has(paymentStatus);
+  const stillPolling = isPending && polling && !exhausted;
+  const presentation = codArm
+    ? COD_PRESENTATION
+    : STATE_PRESENTATION[paymentStatus] || STATE_PRESENTATION.PENDING;
+  const { Icon } = presentation;
+
   // A PENDING order whose polling budget is spent is a TERMINAL screen: it must
   // not keep implying that something is about to happen on this page.
-  const headline = stillPolling
-    ? 'Confirming your payment'
-    : isPending
-      ? 'We are still confirming your payment'
-      : presentation.title;
-
-  const body = stillPolling
-    ? 'We are asking the payment provider directly. Please keep this page open.'
-    : isPending
-      ? `We have not had a final answer from the payment provider for order ${orderNumber}. ` +
-        'We will email you the moment it is confirmed — and if you were charged and it ' +
-        'ultimately fails, it is refunded automatically. Nothing further is needed from you.'
-      : status?.message || presentation.fallback;
+  const headline = codArm
+    ? COD_PRESENTATION.title
+    : stillPolling
+      ? 'Confirming your payment'
+      : isPending
+        ? 'We are still confirming your payment'
+        : presentation.title;
 
   const items = Array.isArray(status?.items) ? status.items : [];
-  const showMoney = paymentStatus === 'COMPLETED' && items.length > 0;
+  const totalLabel = formatMoney(status?.total);
+  const hasTotal = Number.isFinite(Number(status?.total));
+
+  /* §5.6's sentence, verbatim — but it names an amount, so when the server has
+     not sent one the amount is dropped rather than printed as an em dash. */
+  const codBody = hasTotal
+    ? `Pay ${totalLabel} to the courier when it arrives.`
+    : 'Pay the courier when your order arrives.';
+
+  const body = codArm
+    ? codBody
+    : stillPolling
+      ? 'We are asking the payment provider directly. Please keep this page open.'
+      : isPending
+        ? `We have not had a final answer from the payment provider for order ${orderNumber}. ` +
+          'We will email you the moment it is confirmed — and if you were charged and it ' +
+          'ultimately fails, it is refunded automatically. Nothing further is needed from you.'
+        : status?.message || presentation.fallback;
+
+  /* §5.6: `showMoney` becomes COMPLETED || isCOD. Gating it on the PAYMENT
+     state alone is why a cash customer saw no items, no total and no order
+     contents at all. */
+  const showMoney = (paymentStatus === 'COMPLETED' || isCOD) && items.length > 0;
+
+  /* The one honest label for the bottom line. On a cash order nothing has been
+     paid — calling it "Paid" is the kind of thing a customer screenshots. */
+  const totalRowLabel = isCOD ? 'To pay on delivery' : 'Paid';
+
+  /* A placed order — paid or cash — gets the forward actions. A cash order is
+     NOT offered "Retry payment" (that call switches it to PREPAID and would
+     charge online someone who chose to pay the courier) or "Restore my cart"
+     (its stock is already taken and its email already sent). */
+  const settled = paymentStatus === 'COMPLETED' || codArm;
 
   /* `can_retry` is the server's own property (`Order.can_retry_payment`) and it
      is the ONLY thing consulted here. `next_actions` is deliberately NOT used
@@ -423,26 +580,29 @@ const OrderConfirmation = () => {
      customer ends up believing the fault is theirs. (Reported upstream.) */
   const retryableState = ['PENDING', 'FAILED'].includes(paymentStatus);
   const canRetry =
-    status?.can_retry === true || (status?.can_retry === undefined && retryableState);
+    !codArm && (status?.can_retry === true || (status?.can_retry === undefined && retryableState));
   const canRestore =
+    !codArm &&
     ['PENDING', 'FAILED', 'CANCELLED', 'EXPIRED'].includes(paymentStatus) &&
     (nextActions.length === 0 || nextActions.includes('RESTORE_CART'));
 
   return (
-    <Box sx={{ backgroundColor: 'var(--lf-canvas)', py: { xs: 4, md: 7 } }}>
+    <Box sx={{ backgroundColor: 'var(--lf-canvas)' }}>
       <SeoHead
-        title={paymentStatus === 'COMPLETED' ? 'Order confirmed' : 'Your order'}
+        title={settled ? 'Order confirmed' : 'Your order'}
         noindex
         description="Your order and its payment state."
       />
-      <Container maxWidth="sm">
+
+      {/* §5.6 — `md`, not `sm`: this is the highest-trust moment in the store
+          and it was rendering at the width of a password-reset form. */}
+      <Container maxWidth="md" sx={{ pt: 'var(--lf-sect)', pb: 'var(--lf-sect)' }}>
         <Box
           sx={{
             p: { xs: 2.5, md: 4 },
             borderRadius: 'var(--lf-r-panel)',
             border: '1px solid var(--lf-hairline)',
-            backgroundColor: 'var(--lf-surface)',
-            boxShadow: 'var(--lf-e-edge), var(--lf-e1)',
+            backgroundColor: 'var(--lf-paper)',
           }}
         >
           <Stack spacing={2}>
@@ -481,9 +641,9 @@ const OrderConfirmation = () => {
               {body}
             </Typography>
 
-            {stillPolling && (
-              <LinearProgress aria-label="Checking the payment status" />
-            )}
+            {/* Never on the COD arm (§5.6): a progress bar for an answer that
+                is not coming is the whole defect. */}
+            {stillPolling && <LinearProgress aria-label="Checking the payment status" />}
 
             {status?.failure_reason && paymentStatus === 'FAILED' && (
               <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
@@ -493,23 +653,23 @@ const OrderConfirmation = () => {
 
             {showMoney && (
               <Box sx={{ mt: 1 }}>
-                <Divider sx={{ mb: 2 }} />
-                <Stack spacing={1}>
+                <Divider sx={{ mb: 2.5 }} />
+
+                {/* §5.6 — a niche beside every line: the same arch the product
+                    stood in on the shelf, so the order reads as the things you
+                    bought rather than as a bank statement. */}
+                <Stack spacing={2} component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
                   {items.map((item) => (
-                    <Box
-                      key={item.id}
-                      sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}
-                    >
-                      <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)' }}>
-                        {item.product_name} × {item.quantity}
-                      </Typography>
-                      <Typography variant="body2" data-tnum="true">
-                        {formatMoney(item.line_total)}
-                      </Typography>
+                    <Box component="li" key={item.id} sx={{ minWidth: 0 }}>
+                      <OrderLine item={item} />
                     </Box>
                   ))}
-                  <Divider sx={{ my: 0.5 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                </Stack>
+
+                <Divider sx={{ my: 2.5 }} />
+
+                <Stack spacing={1}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
                     <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
                       Subtotal
                     </Typography>
@@ -518,7 +678,7 @@ const OrderConfirmation = () => {
                     </Typography>
                   </Box>
                   {Number(status.discount_amount) > 0 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
                       <Typography variant="body2" sx={{ color: 'var(--lf-ok-ink)' }}>
                         Discount
                       </Typography>
@@ -527,7 +687,7 @@ const OrderConfirmation = () => {
                       </Typography>
                     </Box>
                   )}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
                     <Typography variant="body2" sx={{ color: 'var(--lf-ink-3)' }}>
                       Shipping
                     </Typography>
@@ -537,16 +697,30 @@ const OrderConfirmation = () => {
                         : formatMoney(status.shipping_amount)}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="h6">Paid</Typography>
-                    <Typography variant="price" data-tnum="true" sx={{ fontWeight: 700 }}>
-                      {formatMoney(status.total)}
+                  <Divider sx={{ my: 0.5 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                    <Typography variant="h6">{totalRowLabel}</Typography>
+                    <Typography variant="price" component="p" data-tnum="true">
+                      {totalLabel}
                     </Typography>
                   </Box>
                 </Stack>
+
                 <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)', display: 'block', mt: 2 }}>
                   {copy.deliveryLine}. {copy.returnsLine}
                 </Typography>
+
+                {/* TODO(backend): §5.6 also asks for the delivery address and
+                    the `expected_delivery_date` checkout computes. Neither is
+                    in `orders/views.py::_payment_status_body` — it sends
+                    order/payment state, money and items only — so no block is
+                    rendered for them. §2.25's rule is binding here: never ship
+                    a render condition that can be false for the entire
+                    catalogue without anyone noticing, and a conditional
+                    address block that can never fire is exactly that. Add
+                    `shipping_*` and the shipment's expected date to that
+                    response and the block belongs right here. Until then
+                    `View order` carries both. */}
               </Box>
             )}
 
@@ -558,7 +732,7 @@ const OrderConfirmation = () => {
 
             {/* Real actions in every state — §2f's last column. */}
             <Stack spacing={1.25} sx={{ pt: 1 }}>
-              {paymentStatus === 'COMPLETED' ? (
+              {settled ? (
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
                   <Button component={RouterLink} to={`/orders/${orderId}`} fullWidth>
                     View order
@@ -574,7 +748,11 @@ const OrderConfirmation = () => {
                       onClick={handleRetryPayment}
                       disabled={actionBusy !== null}
                       startIcon={
-                        actionBusy === 'retry' ? <CircularProgress size={18} /> : <ReplayIcon />
+                        actionBusy === 'retry' ? (
+                          <CircularProgress size={18} thickness={3.6} />
+                        ) : (
+                          <ReplayIcon />
+                        )
                       }
                       fullWidth
                     >
@@ -587,7 +765,11 @@ const OrderConfirmation = () => {
                         variant="outlined"
                         onClick={handleRestoreCart}
                         disabled={actionBusy !== null}
-                        startIcon={actionBusy === 'restore' ? <CircularProgress size={18} /> : null}
+                        startIcon={
+                          actionBusy === 'restore' ? (
+                            <CircularProgress size={18} thickness={3.6} />
+                          ) : null
+                        }
                         fullWidth
                       >
                         Restore my cart
@@ -633,6 +815,23 @@ const OrderConfirmation = () => {
           </Stack>
         </Box>
       </Container>
+
+      {/* §5.6 — close on the hearth, once the order is actually placed. The
+          sentence is `brand.territoryLine`, never retyped. It is set in Inter
+          Tight `h2`, NOT `brandDisplay`: Fraunces has exactly three licensed
+          uses — nav wordmark, one home interstitial, footer wordmark — and a
+          fourth is a regression against an explicit owner decision (§10.6).
+          --lf-ink inside `.lf-hearth-section` is #FBF4E8 at 16.59:1 on
+          #1C1411 and 10.52:1 at the glow's brightest point (§3.5). */}
+      {settled && (
+        <Box component="section" className="lf-hearth-section" sx={{ py: 'var(--lf-sect)' }}>
+          <Container maxWidth="md">
+            <Typography variant="h2" component="p" sx={{ color: 'var(--lf-ink)', maxWidth: '36ch' }}>
+              {brand.territoryLine}
+            </Typography>
+          </Container>
+        </Box>
+      )}
     </Box>
   );
 };

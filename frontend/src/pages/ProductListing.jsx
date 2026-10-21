@@ -1,34 +1,87 @@
 /**
- * ProductListing — discovery. **The URL is the single source of truth** (LF-06 / LF-08).
+ * ============================================================================
+ * ProductListing — ART_DIRECTION.md §5.2. THE SHELF.
  *
- * WHAT THIS REPLACES, ALL VERIFIED IN THE FILE IT OVERWRITES
- *  - Filters lived in `useState`, so `/products?category=skincare&page=2` could not be
- *    shared, bookmarked, indexed, or restored by the browser's Back button. The old code
- *    read `?category=` once, mapped the slug to a **numeric id**, and put the id in the
- *    request — so even the one URL it honoured round-tripped into something unshareable.
- *    Everything now derives from `useSearchParams` and is written back with slugs.
- *  - `setTotalPages(Math.ceil(response.data.count / 10))` hard-coded the page size, and
- *    the toolbar printed `{products.length} Products` — the size of the current page,
- *    not the total. Both now come from `count` and the page size this component actually
- *    sends (LF-09).
- *  - `catch { setProducts([]) }` meant a backend outage rendered as **"No products
- *    found. Try adjusting your filters."** A shopper would clear every filter and still
- *    see nothing. LF-26: `status` is one of `loading | error | empty | ready`, there is a
- *    distinct error panel with Retry, and there are THREE different empty copies — a
- *    search with no hits, a filter set with no hits, and a genuinely empty catalogue.
- *  - An unknown slug (`?category=skincar`) silently returned the full catalogue; today
- *    the server would answer `400` and the old code would show "No products found".
- *    There is now an explicit "we don't have that filter" state.
- *  - It read `.data.results` (api.js normalises), rendered `#FAFAFA` (deleted from the
- *    design system), stacked three bordered `Paper` strips above the first product
- *    (~160px of chrome, DESIGN_SYSTEM §8) and passed a `view` prop `ProductCard` ignored.
+ * **The URL is still the single source of truth** (LF-06 / LF-08). Everything
+ * below is a change of chrome and geometry, not of contract: every facet, every
+ * query parameter, `Clear all`, the refresh/Back round-trip, the three empty
+ * copies, the unknown-filter state and the staged mobile sheet survive verbatim.
  *
- * MOBILE FILTERING IS STAGED (DESIGN_SYSTEM §6.7)
- * The sheet edits a **draft**. Nothing refetches until "Show N products" is tapped. The
- * count in that button is kept live by a debounced `page_size=1` count request, which
- * costs one tiny response per pause in ticking instead of re-fetching the whole grid on
- * every tick — "live refetch per tick is unusable on a slow connection".
- */
+ * WHAT §5.2 DELETES, AND WHERE EACH BEHAVIOUR LANDS
+ *
+ *  1. **The 264px always-open desktop filter rail** (§1.3). ~1,300px of facets —
+ *     21 rows at 48px, eight reading `(0)` and inert — inside a ~790px nested
+ *     scroller with no visible scrollbar on overlay-scrollbar platforms,
+ *     consuming 23% of the content width to filter SIX products.
+ *     → **LF-08 is preserved in full**: every facet moves into a desktop
+ *       **`Refine` popover** that renders the *existing* `<ProductFilter>`,
+ *       live, exactly as the rail did. Mobile keeps the *existing* staged
+ *       bottom sheet with `Show N products` — live refetch per tick is
+ *       unusable on Indian 4G, and that sheet is the best-built thing here.
+ *
+ *  2. **`repeat(auto-fill, minmax(156px, 1fr))`**, imported from a
+ *     related-products rail (§1.3, §10.5). Verified at 1440: container 1232 −
+ *     80 gutters = 1152, minus the 264px rail and a 32px gap = 856px of
+ *     results column; `floor((856+12)/168)` = **5 tracks**; `(856−48)/5` =
+ *     **161.6px cards**. That one number caused the mid-word name truncation
+ *     ("Glow Game WaterLess…", "UV Armor Tinted…"), the two-line wrap inside
+ *     `Add to bag` / `Notify me`, and the heart overlapping the Out-of-stock
+ *     chip — all four visible in `plp-desk.png`.
+ *     → `components/product/productGrid.js` (§4): explicit 1 / 2 / 3 columns
+ *       with a 288px floor. Two full rows of three at 1440, **never a ragged
+ *       final row at any breakpoint** (§2.29).
+ *
+ *  3. **The `h1` 48px `All products`** — the largest, boldest, highest-contrast
+ *     element on a page whose products rendered at 161px.
+ *     → `h3` 26px, `component="h1"`.
+ *
+ *  4. **The `Sub-category` facet UI** — the same eight options with the same
+ *     counts as `Concern`, because `products/0008` derives one 1:1 from the
+ *     other. → ONE taxonomy facet, **Concern**. `?sub_category=` stays a fully
+ *     supported URL param: read, written, validated against the taxonomy, and
+ *     rendered as an individually removable chip.
+ *
+ *  5. **Pagination.** Six products, `page_size` 24 — the control could never
+ *     render. See `PAGINATION` below: the `page` parameter itself survives.
+ *
+ *  6. **~1,000px of dead space below a 6-item grid**, and the page's
+ *     `minHeight: 100vh` (the same defect §5.9 names on `Wishlist`: it sits
+ *     inside `Layout`'s flex column, so it guarantees a scrollbar and pushes
+ *     the footer off-screen on every visit). The page now ends: grid → 64px →
+ *     a 96px hearth band carrying `brand.territoryLine` → footer.
+ *
+ * WHAT §5.2 ADDS
+ *
+ *  · **ONE 52px toolbar row**, replacing ~160px of chrome. Left: the concern
+ *    chips that actually have products, plus an `In stock (N)` toggle — this is
+ *    where the deleted `ProductCategories` and `ShopByConcern` navigation lands
+ *    (§1.3). Right: `Refine` and `Sort`.
+ *  · **In-stock first by default** (§2.23), so the page never opens on three
+ *    sold-out cards. A shopper who sorts explicitly gets their sort, untouched.
+ *  · **Sort, fixed rather than re-decorated.** It printed its label twice —
+ *    once as a gold overline from `<FacetGroup legend="Sort by">`, once as the
+ *    field's own `<InputLabel>` — above a blank outlined box with only a caret,
+ *    because the default value is `''` and MUI treats that as empty. One label,
+ *    no facet wrapper, and `renderValue` so `''` reads `Recommended`.
+ *  · **`Price` repaired, not deleted** (§2.25): the old ladder could never
+ *    render once against a ₹480 ceiling. Bands now derive from the catalogue's
+ *    real min and max.
+ *
+ * PAGINATION — READ BEFORE RESTORING IT
+ * §5.2 is explicit: "No pagination for six products (the control is removed,
+ * not rendered-and-empty)." `components/product/ProductPagination.jsx` is
+ * deleted with it. **The `page` URL parameter is deliberately still read,
+ * written and sent**, and the DRF-404-past-the-end fallback is still here, so
+ * every `?page=2` link already in the wild resolves instead of 404ing. The
+ * condition under which the control must come back is exactly one line:
+ * `count > PRODUCT_PAGE_SIZE` (24). At that point products past the first page
+ * are unreachable from this UI, and a control — not a bigger page size — is
+ * the fix. Reported as a deviation.
+ *
+ * NO FABRICATED ANYTHING. Every number on this page is measured: the catalogue
+ * total, the in-stock count, the facet counts and the price extremes all come
+ * from the API. `brand.territoryLine` is read from `brand.js`, never retyped.
+ * ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
@@ -39,6 +92,7 @@ import Container from '@mui/material/Container';
 import Drawer from '@mui/material/Drawer';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
+import Popover from '@mui/material/Popover';
 import Radio from '@mui/material/Radio';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -57,22 +111,22 @@ import {
   listSkinTypes,
   listSubCategories,
 } from '../services/api';
+import { useBrand } from '../content/brand';
 import SeoHead, { absoluteUrl } from '../components/common/SeoHead';
 import EmptyState, { FOCUS_RING_SX, TOUCH_TARGET_SX } from '../components/common/EmptyState';
 import ErrorState from '../components/common/ErrorState';
-import ProductCardSkeleton, {
-  SKELETON_COUNT,
-  useSkeletonDelay,
-} from '../components/common/ProductCardSkeleton';
+import ProductCardSkeleton, { useSkeletonDelay } from '../components/common/ProductCardSkeleton';
 import ProductCard from '../components/product/ProductCard';
 import ProductFilter, {
   MULTI_FACETS,
   SORT_OPTIONS,
+  SortSelect,
   buildPriceBands,
+  priceRangeLabel,
 } from '../components/product/ProductFilter';
-import ProductPagination from '../components/product/ProductPagination';
-import { PRODUCT_GRID_SX } from '../components/product/RelatedProducts';
-import { PRODUCT_PAGE_SIZE, formatRupees } from '../components/product/productPresentation';
+import { PRODUCT_GRID_SX, skeletonCount } from '../components/product/productGrid';
+import { PRODUCT_PAGE_SIZE } from '../components/product/productPresentation';
+import { stockState } from '../utils/stock';
 
 /* -------------------------------------------------------------------------- *
  * URL <-> filter state. Slugs only, so every URL is shareable and indexable.
@@ -178,10 +232,109 @@ const FACET_LABELS = Object.freeze({
   skin_type: 'Skin type',
 });
 
+/**
+ * §10.21 forbids typing a count into a component, and §5.2's header copy is
+ * written in words ("Six formulations. Three on the shelf today."). Both hold:
+ * the NUMBERS come from the API, this only spells them. Past twelve it falls
+ * back to digits rather than inventing an English numeral rule.
+ */
+const NUMBER_WORDS = Object.freeze([
+  'Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six',
+  'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve',
+]);
+const numberWord = (value, { capital = false } = {}) => {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n >= NUMBER_WORDS.length) return String(value);
+  const word = NUMBER_WORDS[n];
+  return capital ? word : word.toLowerCase();
+};
+
+/**
+ * §2.23 / §5.2 — **in stock sorts first, unless the shopper explicitly sorted.**
+ * Opening `/products` on three sold-out cards for cold traffic reads as *sold
+ * out*, not as *organised*.
+ *
+ * A stable partition, not a comparator, so the server's own merchandising
+ * order (`display_order, -created_at`) survives inside each band. `coming_soon`
+ * sits between sellable and out of stock: it keeps its lit niche and its
+ * working link, but it cannot be bought today.
+ *
+ * It orders the PAGE, not the catalogue — at `page_size` 24 against a
+ * six-product shop those are the same set, and pagination is deleted (§5.2).
+ */
+function inStockFirst(products) {
+  const rank = (product) => {
+    const stock = stockState(product);
+    if (stock.sellable) return 0;
+    return stock.lit ? 1 : 2;
+  };
+  return products
+    .map((product, index) => ({ product, index, rank: rank(product) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((entry) => entry.product);
+}
+
+/* -------------------------------------------------------------------------- *
+ * §5.2's toolbar pill. 36px visual, 44px hit area (A6), and the selected state
+ * is an ink fill PLUS a 2px --lf-gold-edge underline — never colour alone (A8).
+ * -------------------------------------------------------------------------- */
+
+const ToolbarChip = ({ selected, onClick, children }) => (
+  <Button
+    className="lf-press"
+    onClick={onClick}
+    aria-pressed={selected}
+    disableElevation
+    sx={{
+      position: 'relative',
+      flex: 'none',
+      minHeight: 36,
+      height: 36,
+      px: '14px',
+      py: 0,
+      borderRadius: 'var(--lf-r-pill)',
+      fontSize: '0.8125rem',
+      fontWeight: 600,
+      whiteSpace: 'nowrap',
+      border: '1px solid var(--lf-border-strong)',
+      backgroundColor: selected ? 'var(--lf-ink)' : 'transparent',
+      color: selected ? 'var(--lf-on-ink)' : 'var(--lf-ink)',
+      /* §10.20 — no raw hex in a component. An unselected pill warms to the
+         niche's own wall colour; a selected one is already the darkest thing
+         in the row, so it answers with the press transform alone. */
+      '@media (hover:hover)': {
+        '&:hover': {
+          backgroundColor: selected ? 'var(--lf-ink)' : 'var(--lf-mat)',
+          borderColor: selected ? 'var(--lf-ink)' : 'var(--lf-border-strong)',
+        },
+      },
+      /* A6 — a 44px hit area around a 36px pill. */
+      '&::before': { content: '""', position: 'absolute', inset: -4 },
+      /* A8 — the second, non-colour cue. 2px --lf-gold-edge at 3.16:1 on
+         canvas, the same indicator the nav and the tab bar use. */
+      '&::after': selected
+        ? {
+            content: '""',
+            position: 'absolute',
+            left: 12,
+            right: 12,
+            bottom: -6,
+            height: 2,
+            backgroundColor: 'var(--lf-gold-edge)',
+          }
+        : undefined,
+      '&.Mui-focusVisible': { outline: '2px solid var(--lf-focus)', outlineOffset: 2 },
+    }}
+  >
+    {children}
+  </Button>
+);
+
 const ProductListing = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [searchParams, setSearchParams] = useSearchParams();
+  const brand = useBrand();
 
   const { filters, search, page } = useMemo(() => readState(searchParams), [searchParams]);
 
@@ -197,15 +350,23 @@ const ProductListing = () => {
   const [count, setCount] = useState(0);
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState(null);
-  const [maxCataloguePrice, setMaxCataloguePrice] = useState(null);
+
+  /** Catalogue-level facts, fetched once: the header line, the `In stock (N)`
+   *  toggle and the price bands are all measured, never typed. */
+  const [catalogue, setCatalogue] = useState({
+    total: null,
+    inStock: null,
+    minPrice: null,
+    maxPrice: null,
+  });
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [refineAnchor, setRefineAnchor] = useState(null);
   const [draft, setDraft] = useState(filters);
   const [draftCount, setDraftCount] = useState(null);
   const [sheetNotice, setSheetNotice] = useState('');
 
-  const gridTopRef = useRef(null);
   const gridControllerRef = useRef(null);
   const draftControllerRef = useRef(null);
   const aliveRef = useRef(true);
@@ -236,7 +397,10 @@ const ProductListing = () => {
     // Any missing facet means the taxonomy cannot be trusted. Checking only categories and
     // sub-categories meant a transient failure of /concerns/ or /skin-types/ left those lists
     // empty but the taxonomy "loaded", so every ?concern= and ?skin_type= URL — the links the
-    // homepage sends people to — was treated as an unknown filter and silently emptied.
+    // toolbar chips now send people to — was treated as an unknown filter and silently emptied.
+    //
+    // `subCategories` is still fetched although its facet UI is deleted (§5.2): it is what
+    // validates a `?sub_category=` slug from an old link and what names its removable chip.
     const failed =
       categories === null || subCategories === null || concerns === null || skinTypes === null;
     setTaxonomy({
@@ -252,23 +416,37 @@ const ProductListing = () => {
     loadTaxonomy();
   }, [loadTaxonomy]);
 
-  /* The real catalogue ceiling, so the price bands cannot offer an empty band. */
+  /* The catalogue's own facts. Three `page_size=1` responses, once per mount:
+     the cheapest product, the dearest, and how many are buyable today. Nothing
+     on this page states a count it did not measure. */
   useEffect(() => {
     let alive = true;
-    listProducts({ ordering: '-price', page_size: 1 })
-      .then(({ items }) => {
-        const top = Number(items?.[0]?.price);
-        if (alive && Number.isFinite(top) && top > 0) setMaxCataloguePrice(top);
-      })
-      .catch(() => {
-        /* bands fall back to the full default ladder */
+    Promise.all([
+      listProducts({ ordering: 'price', page_size: 1 }).catch(() => null),
+      listProducts({ ordering: '-price', page_size: 1 }).catch(() => null),
+      listProducts({ in_stock: true, page_size: 1 }).catch(() => null),
+    ]).then(([cheapest, dearest, inStock]) => {
+      if (!alive) return;
+      const low = Number(cheapest?.items?.[0]?.price);
+      const high = Number(dearest?.items?.[0]?.price);
+      setCatalogue({
+        total: Number.isFinite(cheapest?.count) ? cheapest.count : null,
+        inStock: Number.isFinite(inStock?.count) ? inStock.count : null,
+        minPrice: Number.isFinite(low) && low > 0 ? low : null,
+        maxPrice: Number.isFinite(high) && high > 0 ? high : null,
       });
+    });
     return () => {
       alive = false;
     };
   }, []);
 
-  const priceBands = useMemo(() => buildPriceBands(maxCataloguePrice), [maxCataloguePrice]);
+  /* §2.25 — derived from the REAL extremes, so the facet can no longer be a
+     render condition that is false for the entire catalogue (§10.22). */
+  const priceBands = useMemo(
+    () => buildPriceBands(catalogue.minPrice, catalogue.maxPrice),
+    [catalogue.minPrice, catalogue.maxPrice],
+  );
 
   /** Slugs in the URL that the taxonomy does not know about. */
   const unknownFilters = useMemo(() => {
@@ -320,7 +498,8 @@ const ProductListing = () => {
       // DRF answers 404 for a page number past the end — which is what a shared link to
       // `?page=7` becomes once the catalogue shrinks. That is not an outage, so it must
       // not render an error with a Retry button that can never succeed: fall back to the
-      // first page of the same filter set.
+      // first page of the same filter set. The pagination CONTROL is deleted (§5.2);
+      // this fallback is why deleting it does not break the links already in the wild.
       if (requestError?.isNotFound && page > 1) {
         setSearchParams(writeState({ filters, search, page: 1 }), { replace: true });
         return;
@@ -346,6 +525,12 @@ const ProductListing = () => {
     loadProducts();
   }, [waitingForTaxonomy, unknownKey, loadProducts]);
 
+  /** §2.23 — the shopper's explicit sort always wins over the default. */
+  const orderedProducts = useMemo(
+    () => (filters.ordering ? products : inStockFirst(products)),
+    [filters.ordering, products],
+  );
+
   /* ------------------------------------------------------------------ *
    * writing back to the URL
    * ------------------------------------------------------------------ */
@@ -356,17 +541,6 @@ const ProductListing = () => {
       setSearchParams(writeState({ filters: nextFilters, search, page: 1 }), { replace: true });
     },
     [search, setSearchParams],
-  );
-
-  /** A page change PUSHES, because Back from page 2 to page 1 is a real expectation. */
-  const changePage = useCallback(
-    (_event, nextPage) => {
-      setSearchParams(writeState({ filters, search, page: nextPage }));
-      if (gridTopRef.current) {
-        gridTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    },
-    [filters, search, setSearchParams],
   );
 
   const clearAll = useCallback(() => {
@@ -385,34 +559,56 @@ const ProductListing = () => {
         setSearchParams(writeState({ filters, search: '', page: 1 }), { replace: true });
         return;
       } else if (MULTI_FACETS.includes(key)) {
+        // No dependent pruning: `sub_category` no longer has a facet UI, so the
+        // only thing pruning could do now is silently discard the slug an old
+        // link arrived with. Its chip is right here and removes it explicitly.
         next[key] = (filters[key] || []).filter((slug) => slug !== value);
-        if (key === 'category') {
-          // Keep the dependent facet honest (same rule as ProductFilter's own pruning).
-          const allowed = new Set(
-            (next.category.length
-              ? taxonomy.subCategories.filter((sub) => next.category.includes(sub.category?.slug))
-              : taxonomy.subCategories
-            ).map((sub) => sub.slug),
-          );
-          next.sub_category = (next.sub_category || []).filter((slug) => allowed.has(slug));
-        }
       } else {
         next[key] = key === 'ordering' ? '' : null;
       }
       applyFilters(next);
     },
-    [applyFilters, filters, setSearchParams, taxonomy.subCategories],
+    [applyFilters, filters, setSearchParams],
+  );
+
+  const toggleConcern = useCallback(
+    (slug) => {
+      const current = filters.concern || [];
+      applyFilters({
+        ...filters,
+        concern: current.includes(slug)
+          ? current.filter((item) => item !== slug)
+          : [...current, slug],
+      });
+    },
+    [applyFilters, filters],
+  );
+
+  const toggleInStock = useCallback(() => {
+    applyFilters({ ...filters, in_stock: filters.in_stock === true ? null : true });
+  }, [applyFilters, filters]);
+
+  const setOrdering = useCallback(
+    (ordering) => applyFilters({ ...filters, ordering }),
+    [applyFilters, filters],
   );
 
   /* ------------------------------------------------------------------ *
-   * the staged mobile sheet
+   * Refine — one trigger, two presentations, ONE ProductFilter
    * ------------------------------------------------------------------ */
 
-  const openFilters = () => {
-    setDraft(filters);
-    setDraftCount(count);
-    setSheetNotice('');
-    setFiltersOpen(true);
+  const openRefine = (event) => {
+    if (isMobile) {
+      // The mobile sheet is STAGED. Nothing refetches until "Show N products"
+      // is tapped: live refetch per tick is unusable on Indian 4G.
+      setDraft(filters);
+      setDraftCount(count);
+      setSheetNotice('');
+      setFiltersOpen(true);
+      return;
+    }
+    // The desktop popover is LIVE, exactly as the rail it replaces was.
+    setRefineAnchor(event.currentTarget);
   };
 
   const dismissFilters = (reason) => {
@@ -462,6 +658,16 @@ const ProductListing = () => {
     [taxonomy],
   );
 
+  /** The concern chips that actually have products (§5.2, LF-24's render rule). */
+  const concernChips = useMemo(
+    () =>
+      (taxonomy.concerns || []).filter((concern) => {
+        const productCount = Number(concern.listed_count ?? concern.product_count);
+        return Number.isFinite(productCount) ? productCount > 0 : true;
+      }),
+    [taxonomy.concerns],
+  );
+
   const activeChips = useMemo(() => {
     const chips = [];
     if (search) chips.push({ key: 'search', value: search, label: `Search: “${search}”` });
@@ -472,12 +678,10 @@ const ProductListing = () => {
     });
     if (filters.in_stock === true) chips.push({ key: 'in_stock', value: true, label: 'In stock only' });
     if (filters.min_price !== null || filters.max_price !== null) {
-      const min = filters.min_price !== null ? formatRupees(filters.min_price) : null;
-      const max = filters.max_price !== null ? formatRupees(filters.max_price) : null;
       chips.push({
         key: 'price',
         value: 'price',
-        label: min && max ? `${min} – ${max}` : max ? `Under ${max}` : `${min} and above`,
+        label: priceRangeLabel(priceBands, filters.min_price, filters.max_price),
       });
     }
     if (filters.ordering) {
@@ -485,17 +689,20 @@ const ProductListing = () => {
       if (option) chips.push({ key: 'ordering', value: filters.ordering, label: `Sorted: ${option.label}` });
     }
     return chips;
-  }, [filters, nameFor, search]);
+  }, [filters, nameFor, priceBands, search]);
 
   const filterCount = activeChips.filter((chip) => chip.key !== 'ordering').length;
 
   /** The page's own name, built only from facts in the URL and the taxonomy. */
-  const { heading, introCopy, canonicalPath, indexable } = useMemo(() => {
+  const { heading, seoTitle, introCopy, canonicalPath, indexable } = useMemo(() => {
     const singleCategory = filters.category.length === 1 ? filters.category[0] : null;
     const singleSub = filters.sub_category.length === 1 ? filters.sub_category[0] : null;
     const singleConcern = filters.concern.length === 1 ? filters.concern[0] : null;
 
-    let title = 'All products';
+    // §5.2: the unfiltered page is THE SHELF, at h3 26px — not `All products`
+    // at h1 48px, which made the page's loudest element a label for a page you
+    // were already on. The indexable <title> stays the plain-language one.
+    let title = null;
     if (search) title = `Results for “${search}”`;
     else if (singleSub) title = nameFor('sub_category', singleSub);
     else if (singleCategory) title = nameFor('category', singleCategory);
@@ -526,12 +733,27 @@ const ProductListing = () => {
       filters.max_price === null;
 
     return {
-      heading: title,
+      heading: title || 'The shelf',
+      seoTitle: title || 'All products',
       introCopy: intro,
       canonicalPath: canonicalQuery ? `/products?${canonicalQuery}` : '/products',
       indexable: isIndexable,
     };
   }, [filters, nameFor, page, search, taxonomy.concerns]);
+
+  /**
+   * §5.2's sub-head, with every number measured rather than typed (§10.21):
+   * "Six formulations. Three on the shelf today." It only renders once both
+   * counts are known — a sentence about the shop is not worth a guess.
+   */
+  const shelfLine = useMemo(() => {
+    const { total, inStock } = catalogue;
+    if (!Number.isFinite(total) || total <= 0) return null;
+    const formulations = `${numberWord(total, { capital: true })} ${total === 1 ? 'formulation' : 'formulations'}.`;
+    if (!Number.isFinite(inStock)) return formulations;
+    if (inStock === 0) return `${formulations} None on the shelf today.`;
+    return `${formulations} ${numberWord(inStock, { capital: true })} on the shelf today.`;
+  }, [catalogue]);
 
   const jsonLd = useMemo(() => {
     const collectionUrl = absoluteUrl(canonicalPath);
@@ -539,8 +761,8 @@ const ProductListing = () => {
       { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
       { '@type': 'ListItem', position: 2, name: 'Products', item: absoluteUrl('/products') },
     ];
-    if (heading !== 'All products' && !search) {
-      crumbs.push({ '@type': 'ListItem', position: 3, name: heading, item: collectionUrl });
+    if (seoTitle !== 'All products' && !search) {
+      crumbs.push({ '@type': 'ListItem', position: 3, name: seoTitle, item: collectionUrl });
     }
 
     const documents = [{ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs }];
@@ -549,13 +771,15 @@ const ProductListing = () => {
       documents.push({
         '@context': 'https://schema.org',
         '@type': 'CollectionPage',
-        name: heading,
+        name: seoTitle,
         description: introCopy || undefined,
         url: collectionUrl,
         mainEntity: {
           '@type': 'ItemList',
           numberOfItems: count,
-          itemListElement: products.map((product, index) => ({
+          // The order the shopper actually sees (§2.23), so the structured
+          // data cannot disagree with the page.
+          itemListElement: orderedProducts.map((product, index) => ({
             '@type': 'ListItem',
             position: (page - 1) * PRODUCT_PAGE_SIZE + index + 1,
             name: product.name,
@@ -566,26 +790,15 @@ const ProductListing = () => {
     }
 
     return documents;
-  }, [canonicalPath, count, heading, introCopy, page, products, search, status]);
+  }, [canonicalPath, count, introCopy, orderedProducts, page, search, seoTitle, status]);
 
-  const totalPages = Math.max(1, Math.ceil((count || 0) / PRODUCT_PAGE_SIZE));
   const showSkeletons = useSkeletonDelay(status === 'loading');
-  const skeletonCount = isMobile ? SKELETON_COUNT.mobile : SKELETON_COUNT.desktop;
+  const skeletons = skeletonCount(count || 6, isMobile ? 2 : 3);
+  const refineOpen = Boolean(refineAnchor);
 
   /* ------------------------------------------------------------------ *
    * render
    * ------------------------------------------------------------------ */
-
-  const railFilter = (
-    <ProductFilter
-      value={filters}
-      onChange={applyFilters}
-      taxonomy={taxonomy}
-      taxonomyStatus={taxonomyStatus}
-      onRetryTaxonomy={loadTaxonomy}
-      priceBands={priceBands}
-    />
-  );
 
   const resultsRegion = (() => {
     if (status === 'error') {
@@ -662,28 +875,20 @@ const ProductListing = () => {
     }
 
     return (
-      <>
-        <Box sx={PRODUCT_GRID_SX} aria-busy={status === 'loading'}>
-          {status === 'loading'
-            ? showSkeletons
-              ? <ProductCardSkeleton count={skeletonCount} />
-              : null
-            : products.map((product) => <ProductCard key={product.id} product={product} />)}
-        </Box>
-
-        {status === 'ready' && totalPages > 1 ? (
-          <Box sx={{ mt: 4 }}>
-            <ProductPagination count={totalPages} page={page} onChange={changePage} />
-          </Box>
-        ) : null}
-      </>
+      <Box sx={PRODUCT_GRID_SX} aria-busy={status === 'loading'}>
+        {status === 'loading'
+          ? showSkeletons
+            ? <ProductCardSkeleton count={skeletons} />
+            : null
+          : orderedProducts.map((product) => <ProductCard key={product.id} product={product} />)}
+      </Box>
     );
   })();
 
   return (
-    <Box sx={{ backgroundColor: 'var(--lf-canvas)', minHeight: '100vh', py: { xs: 2, md: 4 } }}>
+    <Box sx={{ backgroundColor: 'var(--lf-canvas)' }}>
       <SeoHead
-        title={heading === 'All products' ? 'All products' : heading}
+        title={seoTitle}
         description={
           introCopy ||
           'Browse every Le foyeR. formulation — cleansers, moisturisers, sun protection and haircare, with free standard delivery and 7-day returns.'
@@ -693,8 +898,8 @@ const ProductListing = () => {
         jsonLd={jsonLd}
       />
 
-      <Container maxWidth="lg">
-        {/* breadcrumb -> h1 -> indexable copy, ABOVE the grid (DESIGN_SYSTEM §8) */}
+      <Container maxWidth="lg" sx={{ pt: 'var(--lf-sect-sm)', pb: 0 }}>
+        {/* ---- HEADER: breadcrumb -> h3 -> one line -> ledge ------------- */}
         <Box component="nav" aria-label="Breadcrumb" sx={{ mb: 1 }}>
           <Typography variant="caption" sx={{ color: 'var(--lf-ink-3)' }}>
             <Typography
@@ -706,7 +911,7 @@ const ProductListing = () => {
               Home
             </Typography>
             {' / '}
-            {heading === 'All products' ? (
+            {heading === 'The shelf' ? (
               'Products'
             ) : (
               <>
@@ -724,148 +929,315 @@ const ProductListing = () => {
           </Typography>
         </Box>
 
-        <Typography variant="h1" component="h1" sx={{ mb: introCopy ? 1 : 2 }}>
+        <Typography variant="h3" component="h1" sx={{ color: 'var(--lf-ink)' }}>
           {heading}
         </Typography>
-        {introCopy ? (
-          <Typography variant="body1" sx={{ color: 'var(--lf-ink-2)', maxWidth: '68ch', mb: 2 }}>
-            {introCopy}
+
+        {introCopy || shelfLine ? (
+          <Typography
+            variant="body2"
+            sx={{ color: 'var(--lf-ink-3)', maxWidth: '62ch', mt: 1 }}
+          >
+            {introCopy || shelfLine}
           </Typography>
         ) : null}
 
-        <Box sx={{ display: 'flex', gap: { md: 4 }, alignItems: 'flex-start' }}>
-          {/* ---------------- desktop rail: live, borderless, in tab order ---------------- */}
-          {!isMobile ? (
-            <Box
-              sx={{
-                width: 264,
-                flexShrink: 0,
-                position: 'sticky',
-                top: 'calc(var(--lf-nav-h) + 24px)',
-                maxHeight: 'calc(100vh - var(--lf-nav-h) - 48px)',
-                overflowY: 'auto',
-                overscrollBehavior: 'contain',
-                pr: 1,
-              }}
+        <Box className="lf-ledge" sx={{ mt: 2 }} />
+
+        {/* ---- §5.2's ONE TOOLBAR ROW ------------------------------------
+            It replaces ~160px of stacked chrome AND the 264px / ~1,300px
+            rail. Below the `shelf` breakpoint the chip scroller takes its own
+            line rather than being squeezed to ~88px of visible track — the
+            §5.2 arithmetic is written for the desktop row it replaces. */}
+        <Box
+          sx={{
+            position: 'sticky',
+            top: 'var(--lf-nav-h)',
+            zIndex: 3,
+            /* OPAQUE canvas, never glass: a second blurred bar above a
+               scrolling grid is exactly the cost P6 refuses on a mid-range
+               Android. */
+            backgroundColor: 'var(--lf-canvas)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 1,
+            minHeight: 52,
+            mt: 3,
+          }}
+        >
+          {/* LEFT: the navigation the deleted ProductCategories and
+              ShopByConcern used to carry, as the only concerns that have
+              products, plus the availability toggle. */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              minWidth: 0,
+              flex: { xs: '1 0 100%', shelf: '1 1 auto' },
+              order: { xs: 2, shelf: 1 },
+              overflowX: 'auto',
+              /* room for the selected pill's -6px gold underline, pulled back
+                 out so it costs the row no height */
+              pt: '2px',
+              pb: '10px',
+              mb: '-10px',
+              scrollbarWidth: 'none',
+              '&::-webkit-scrollbar': { display: 'none' },
+              /* A right-edge fade so the row LOOKS scrollable. Without it the track
+                 clipped mid-word at 390px ("Body Care (" with the count sliced off)
+                 and the "In stock" chip — the highest-value facet on the page —
+                 read as unreachable. A mask, not a blur: §9.4/P6 forbids blur in a
+                 scrolling list, and a mask costs no compositing work.
+                 It is painted only while the row actually overflows, and dropped for
+                 anyone who has asked for less transparency. */
+              '@media (min-width: 0px)': {
+                maskImage:
+                  'linear-gradient(to right, #000 calc(100% - 32px), transparent 100%)',
+                WebkitMaskImage:
+                  'linear-gradient(to right, #000 calc(100% - 32px), transparent 100%)',
+              },
+              '&[data-scroll-end="true"]': { maskImage: 'none', WebkitMaskImage: 'none' },
+              '@media (prefers-reduced-transparency: reduce)': {
+                maskImage: 'none',
+                WebkitMaskImage: 'none',
+              },
+            }}
+            onScroll={(event) => {
+              const el = event.currentTarget;
+              const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+              el.setAttribute('data-scroll-end', atEnd ? 'true' : 'false');
+            }}
+          >
+            {concernChips.map((concern) => {
+              /* `listed_count`, not `product_count`: selecting a facet returns every
+                 VISIBLE product (LF-02 keeps out-of-stock items listed with a Notify me),
+                 while `product_count` counts only what is buyable, which is what LF-24
+                 gates tile visibility on. Printing the latter here made the chip
+                 "Cleansers (1)" return four products. */
+              const productCount = Number(
+                concern.listed_count ?? concern.product_count,
+              );
+              return (
+                <ToolbarChip
+                  key={concern.slug}
+                  selected={(filters.concern || []).includes(concern.slug)}
+                  onClick={() => toggleConcern(concern.slug)}
+                >
+                  {Number.isFinite(productCount)
+                    ? `${concern.name} (${productCount})`
+                    : concern.name}
+                </ToolbarChip>
+              );
+            })}
+            {Number.isFinite(catalogue.inStock) && catalogue.inStock > 0 ? (
+              <ToolbarChip selected={filters.in_stock === true} onClick={toggleInStock}>
+                {`In stock (${catalogue.inStock})`}
+              </ToolbarChip>
+            ) : null}
+          </Box>
+
+          {/* RIGHT: Refine + Sort. */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              flex: { xs: '1 1 100%', shelf: '0 0 auto' },
+              order: { xs: 1, shelf: 2 },
+              ml: { shelf: 'auto' },
+            }}
+          >
+            <Button
+              className="lf-press"
+              variant="outlined"
+              startIcon={<FilterListIcon />}
+              onClick={openRefine}
+              aria-haspopup="dialog"
+              aria-expanded={isMobile ? filtersOpen : refineOpen}
+              sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX, flex: { xs: 1, shelf: 'none' }, whiteSpace: 'nowrap' }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 1.5 }}>
-                <Typography variant="h5" component="h2">
-                  Filters
-                </Typography>
-                {filterCount > 0 ? (
-                  <Button
-                    className="lf-press"
-                    variant="text"
-                    size="small"
-                    onClick={clearAll}
-                    sx={{ ...FOCUS_RING_SX, color: 'var(--lf-ink-2)' }}
-                  >
-                    Clear all
-                  </Button>
-                ) : null}
-              </Box>
-              {railFilter}
-            </Box>
+              {filterCount > 0 ? `Refine (${filterCount})` : 'Refine'}
+            </Button>
+
+            {isMobile ? (
+              <Button
+                className="lf-press"
+                variant="outlined"
+                startIcon={<SortIcon />}
+                onClick={() => setSortOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={sortOpen}
+                sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX, flex: 1, whiteSpace: 'nowrap' }}
+              >
+                Sort
+              </Button>
+            ) : (
+              <SortSelect value={filters.ordering} onChange={setOrdering} />
+            )}
+          </Box>
+        </Box>
+
+        {/* ---- the results region ---------------------------------------- */}
+        <Box sx={{ mt: 3, minWidth: 0 }}>
+          {/* The count is news only when something has narrowed the page; the
+              header already states the catalogue's size. LF-09: it is always
+              the TOTAL from `count`, never `products.length`. */}
+          <Typography
+            variant="caption"
+            component="p"
+            role="status"
+            aria-live="polite"
+            sx={{ display: 'block', m: 0, mb: 1.5, minHeight: 19, color: 'var(--lf-ink-3)' }}
+          >
+            {status === 'loading'
+              ? 'Loading products…'
+              : status === 'ready' && (search || anyFacetActive(filters))
+                ? `${count} ${count === 1 ? 'product' : 'products'}`
+                : ''}
+            {sheetNotice ? <span className="lf-sr-only">{` ${sheetNotice}`}</span> : null}
+          </Typography>
+
+          {/* individually removable chips + Clear all. This is where a
+              `?sub_category=` slug from an old link stays visible and
+              removable now that its facet UI is gone. */}
+          {activeChips.length ? (
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+              {activeChips.map((chip) => (
+                <Chip
+                  key={`${chip.key}-${chip.value}`}
+                  variant="filter"
+                  label={chip.label}
+                  onDelete={() => removeFilter(chip.key, chip.value)}
+                  sx={{ ...FOCUS_RING_SX }}
+                />
+              ))}
+              <Button
+                className="lf-press"
+                variant="text"
+                size="small"
+                onClick={clearAll}
+                sx={{ ...FOCUS_RING_SX, color: 'var(--lf-ink-2)' }}
+              >
+                Clear all
+              </Button>
+            </Stack>
           ) : null}
 
-          {/* ---------------- results column. `minWidth: 0` is load-bearing (§8). -------- */}
-          <Box sx={{ flex: 1, minWidth: 0 }} ref={gridTopRef}>
-            {/* mobile: one sticky 56px sub-bar, two 44px buttons (§6.7) */}
-            {isMobile ? (
-              <Box
-                className="lf-glass"
-                sx={{
-                  position: 'sticky',
-                  top: 'var(--lf-nav-h)',
-                  zIndex: 2,
-                  display: 'flex',
-                  gap: 1,
-                  py: 1,
-                  mb: 1.5,
-                  borderBottom: '1px solid var(--lf-hairline)',
-                }}
-              >
-                <Button
-                  className="lf-press"
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<FilterListIcon />}
-                  onClick={openFilters}
-                  aria-haspopup="dialog"
-                  aria-expanded={filtersOpen}
-                  sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
-                >
-                  {filterCount > 0 ? `Filters (${filterCount})` : 'Filters'}
-                </Button>
-                <Button
-                  className="lf-press"
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<SortIcon />}
-                  onClick={() => setSortOpen(true)}
-                  aria-haspopup="dialog"
-                  aria-expanded={sortOpen}
-                  sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
-                >
-                  Sort
-                </Button>
-              </Box>
-            ) : null}
-
-            {/* one toolbar row: the TOTAL, not the page size (LF-09) */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 2,
-                minHeight: 52,
-                borderBottom: '1px solid var(--lf-hairline)',
-                mb: 2,
-              }}
-            >
-              <Typography variant="body2" role="status" aria-live="polite" sx={{ color: 'var(--lf-ink-2)' }}>
-                {status === 'loading'
-                  ? 'Loading products…'
-                  : status === 'ready'
-                    ? `${count} ${count === 1 ? 'product' : 'products'}${totalPages > 1 ? ` · page ${page} of ${totalPages}` : ''}`
-                    : ''}
-              </Typography>
-              <Box component="span" className="lf-sr-only" aria-live="polite">
-                {sheetNotice}
-              </Box>
-            </Box>
-
-            {/* individually removable chips + Clear all */}
-            {activeChips.length ? (
-              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-                {activeChips.map((chip) => (
-                  <Chip
-                    key={`${chip.key}-${chip.value}`}
-                    variant="filter"
-                    label={chip.label}
-                    onDelete={() => removeFilter(chip.key, chip.value)}
-                    sx={{ ...FOCUS_RING_SX }}
-                  />
-                ))}
-                <Button
-                  className="lf-press"
-                  variant="text"
-                  size="small"
-                  onClick={clearAll}
-                  sx={{ ...FOCUS_RING_SX, color: 'var(--lf-ink-2)' }}
-                >
-                  Clear all
-                </Button>
-              </Stack>
-            ) : null}
-
-            {resultsRegion}
-          </Box>
+          {resultsRegion}
         </Box>
       </Container>
 
-      {/* ---------------- mobile filter sheet: STAGED (§6.7) ---------------- */}
+      {/* ---- THE PAGE ENDS (§5.2): grid -> 64px -> the footer ------------
+          No "You might also like", no filler, no 1,000px of void.
+
+          There was a 96px hearth band here carrying brand.territoryLine. It is
+          gone because the footer opens with the SAME sentence 105px further
+          down, so the page printed the brand's closing line twice in two
+          near-identical dark bands separated by a strip of canvas. §5.11 is
+          explicit that the hearth sentence is THE BRAND'S LAST WORD, which
+          only works if it is said once. The 64px of air plus the footer is the
+          cleaner ending. */}
+      <Box sx={{ mt: 8 }} />
+
+      {/* ---- DESKTOP: the Refine popover. LF-08, intact. -----------------
+          The SAME <ProductFilter> the rail rendered, live, writing the same
+          URL params. MUI's Popover is modal: Escape closes it and focus is
+          trapped, so `Clear all` and the refresh/Back round-trip behave
+          exactly as they did in the rail. */}
+      <Popover
+        open={refineOpen}
+        anchorEl={refineAnchor}
+        onClose={() => setRefineAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{
+          paper: {
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-label': 'Filters',
+            sx: {
+              mt: 1,
+              width: 360,
+              maxWidth: 'calc(100vw - 2 * var(--lf-gutter))',
+              backgroundColor: 'var(--lf-paper)',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: 'calc(100vh - var(--lf-nav-h) - 96px)',
+            },
+          },
+        }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            px: 2,
+            py: 1.5,
+            borderBottom: '1px solid var(--lf-hairline)',
+          }}
+        >
+          <Typography variant="h5" component="h2">
+            Filters
+          </Typography>
+          <IconButton
+            onClick={() => setRefineAnchor(null)}
+            aria-label="Close filters"
+            sx={{ width: 44, height: 44, ...FOCUS_RING_SX }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+
+        {/* `.lf-scroll` keeps the focus ring inside the scroller (A7). */}
+        <Box
+          className="lf-scroll"
+          sx={{ px: 2, py: 2, overflowY: 'auto', overscrollBehavior: 'contain' }}
+        >
+          <ProductFilter
+            value={filters}
+            onChange={applyFilters}
+            taxonomy={taxonomy}
+            taxonomyStatus={taxonomyStatus}
+            onRetryTaxonomy={loadTaxonomy}
+            priceBands={priceBands}
+          />
+        </Box>
+
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1.5,
+            px: 2,
+            py: 1.5,
+            borderTop: '1px solid var(--lf-hairline)',
+          }}
+        >
+          <Button
+            className="lf-press"
+            variant="text"
+            onClick={clearAll}
+            sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX, color: 'var(--lf-ink-2)' }}
+          >
+            Clear all
+          </Button>
+          <Button
+            className="lf-press"
+            variant="outlined"
+            onClick={() => setRefineAnchor(null)}
+            sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX }}
+          >
+            Done
+          </Button>
+        </Box>
+      </Popover>
+
+      {/* ---- MOBILE: the existing STAGED filter sheet, unchanged --------- */}
       <Drawer
         anchor="bottom"
         open={filtersOpen}
@@ -875,7 +1247,7 @@ const ProductListing = () => {
             maxHeight: '92dvh',
             borderTopLeftRadius: 'var(--lf-r-panel)',
             borderTopRightRadius: 'var(--lf-r-panel)',
-            backgroundColor: 'var(--lf-surface)',
+            backgroundColor: 'var(--lf-paper)',
           },
           role: 'dialog',
           'aria-modal': 'true',
@@ -896,7 +1268,7 @@ const ProductListing = () => {
             justifyContent: 'space-between',
             minHeight: 56,
             px: 2,
-            backgroundColor: 'var(--lf-surface)',
+            backgroundColor: 'var(--lf-paper)',
             borderBottom: '1px solid var(--lf-hairline)',
           }}
         >
@@ -912,7 +1284,7 @@ const ProductListing = () => {
           </IconButton>
         </Box>
 
-        <Box sx={{ px: 2, py: 2, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+        <Box className="lf-scroll" sx={{ px: 2, py: 2, overflowY: 'auto', overscrollBehavior: 'contain' }}>
           <ProductFilter
             value={draft}
             onChange={setDraft}
@@ -933,7 +1305,7 @@ const ProductListing = () => {
             gap: 1.5,
             px: 2,
             pt: 1.5,
-            backgroundColor: 'var(--lf-surface)',
+            backgroundColor: 'var(--lf-paper)',
             borderTop: '1px solid var(--lf-hairline)',
           }}
         >
@@ -963,7 +1335,7 @@ const ProductListing = () => {
         </Box>
       </Drawer>
 
-      {/* ---------------- mobile sort sheet: one choice, applied immediately ---------- */}
+      {/* ---- MOBILE: sort sheet, one choice, applied immediately --------- */}
       <Drawer
         anchor="bottom"
         open={sortOpen}
@@ -972,7 +1344,7 @@ const ProductListing = () => {
           sx: {
             borderTopLeftRadius: 'var(--lf-r-panel)',
             borderTopRightRadius: 'var(--lf-r-panel)',
-            backgroundColor: 'var(--lf-surface)',
+            backgroundColor: 'var(--lf-paper)',
           },
           role: 'dialog',
           'aria-modal': 'true',
@@ -998,7 +1370,7 @@ const ProductListing = () => {
                   checked={(filters.ordering || '') === option.value}
                   onChange={() => {
                     setSortOpen(false);
-                    applyFilters({ ...filters, ordering: option.value });
+                    setOrdering(option.value);
                   }}
                   sx={{ ...FOCUS_RING_SX }}
                 />

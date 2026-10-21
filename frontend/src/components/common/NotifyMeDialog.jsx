@@ -11,8 +11,8 @@
  * It posts to `products/products/:slug/notify-me/`, which is throttled to 5/hour, so the
  * 429 path is a real path and is handled as "slow down", not as "failed".
  *
- * Two ways in:
- *   <NotifyMeButton slug={p.slug} productName={p.name} fullWidth />   // owns its state
+ * ONE way in, since `NotifyMeButton` was deleted (see the note above the default
+ * export): `components/product/NotifyMe.jsx` owns the control and the open state.
  *   <NotifyMeDialog open={open} onClose={close} slug={p.slug} productName={p.name} />
  */
 
@@ -359,63 +359,12 @@ const NotifyMeDialog = ({ open, onClose, slug, productName, onSubscribed }) => {
 };
 
 /**
- * The control that belongs where Add to Cart would have been, with the dialog wired up.
- * @param {object} props
- * @param {string} props.slug
- * @param {string} [props.productName]
- * @param {string} [props.label="Notify me when it's back"]
- * @param {boolean} [props.fullWidth=false] Set true on a product card, where it takes
- *   the full-width Add to Bag slot.
- * @param {'text'|'outlined'|'contained'} [props.variant='contained'] On an unsellable
- *   product this IS the primary action, so `contained` is the default.
- * @param {'small'|'medium'|'large'} [props.size='medium']
- * @param {Function} [props.onSubscribed]
- * @param {object} [props.sx]
+ * `NotifyMeButton` WAS EXPORTED HERE AND IS DELETED (integration step / §9.10).
+ * It rendered an ink `contained` Button with a bell `startIcon`; §6.6 replaces
+ * both — the restock control is `components/product/NotifyMe.jsx`, gold fill 1
+ * of 2 with an --lf-ink label, and §2.15 deletes the glyph. Its last consumer
+ * was the PDP, which has moved. THIS DIALOG is still the one notify mechanism:
+ * <NotifyMe size="card"> opens it, so the default export below stays.
  */
-export const NotifyMeButton = ({
-  slug,
-  productName,
-  label = "Notify me when it's back",
-  fullWidth = false,
-  variant = 'contained',
-  size = 'medium',
-  onSubscribed,
-  sx,
-}) => {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <Button
-        className="lf-press"
-        variant={variant}
-        color="primary"
-        size={size}
-        disableElevation
-        fullWidth={fullWidth}
-        onClick={(event) => {
-          // Product cards wrap their title in a link; opening a dialog must not
-          // also navigate.
-          event.preventDefault();
-          event.stopPropagation();
-          setOpen(true);
-        }}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        sx={{ ...TOUCH_TARGET_SX, ...FOCUS_RING_SX, ...sx }}
-        startIcon={<NotificationsNoneOutlinedIcon />}
-      >
-        {label}
-      </Button>
-      <NotifyMeDialog
-        open={open}
-        onClose={() => setOpen(false)}
-        slug={slug}
-        productName={productName}
-        onSubscribed={onSubscribed}
-      />
-    </>
-  );
-};
 
 export default NotifyMeDialog;

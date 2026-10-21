@@ -1,6 +1,12 @@
 /**
  * ErrorState — what a backend outage is supposed to look like.
  *
+ * §5.8: "Error panels keep their 3px semantic left edge, `role="alert"`, plain
+ * language, NEVER a status code, and backoff 600ms -> 1.5s -> 4s." All four were
+ * already true here and all four are preserved verbatim; this revision only moves the
+ * primary action onto §5.8's 48px ink geometry and drops the stale hex fallbacks that
+ * predate §3's token rewrite.
+ *
  * This component exists because of the single most common defect in the previous code:
  * a failed fetch and an empty result set were the same branch, so stopping the API made
  * the listing page say "No products found. Try adjusting your filters." The shopper
@@ -39,7 +45,7 @@ import WifiOffOutlinedIcon from '@mui/icons-material/WifiOffOutlined';
 import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlined';
 
 import SupportLink from './SupportLink';
-import { FOCUS_RING_SX, StateShell, TOUCH_TARGET_SX } from './EmptyState';
+import { FOCUS_RING_SX, PRIMARY_ACTION_SX, StateShell, TOUCH_TARGET_SX } from './EmptyState';
 
 /** §6.9: 600ms, then 1.5s, then 4s. Index = attempts already made. */
 export const RETRY_BACKOFF_MS = [600, 1500, 4000];
@@ -173,7 +179,7 @@ const ErrorState = ({
         onClick={handleRetry}
         aria-busy={retrying ? 'true' : undefined}
         sx={{
-          ...TOUCH_TARGET_SX,
+          ...PRIMARY_ACTION_SX,
           px: 3,
           width: { xs: '100%', sm: 'auto' },
           ...FOCUS_RING_SX,
@@ -198,9 +204,9 @@ const ErrorState = ({
         onClick={onSecondary}
         {...(secondaryTo ? { component: RouterLink, to: secondaryTo } : {})}
         sx={{
-          ...TOUCH_TARGET_SX,
+          ...(showRetry ? TOUCH_TARGET_SX : PRIMARY_ACTION_SX),
           px: showRetry ? 2 : 3,
-          color: showRetry ? 'var(--lf-ink-2, #4A433C)' : undefined,
+          color: showRetry ? 'var(--lf-ink-2)' : undefined,
           width: { xs: '100%', sm: 'auto' },
           ...FOCUS_RING_SX,
         }}
@@ -227,7 +233,7 @@ const ErrorState = ({
     >
       {exhausted ? (
         <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="body2" sx={{ color: 'var(--lf-ink-2, #4A433C)', mb: 1 }}>
+          <Typography variant="body2" sx={{ color: 'var(--lf-ink-2)', mb: 1 }}>
             That has failed {maxAttempts} times now, so it is not a connection blip.
           </Typography>
           <SupportLink topic="technical" />
